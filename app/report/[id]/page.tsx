@@ -272,6 +272,31 @@ export default function ReportPage() {
             })}
           </div>
 
+          {/* Roadmap */}
+          <div style={{
+            marginTop: 28, padding: '18px 20px',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-subtle)',
+            background: 'var(--bg-secondary)',
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>
+              Roadmap — What&apos;s Next
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+              {[
+                { icon: '🔄', title: 'CI/CD Integration', desc: 'Fail the build automatically if critical AI security issues are detected on every PR.' },
+                { icon: '📡', title: 'Continuous Monitoring', desc: 'Schedule scans against production and get alerted when new vulnerabilities appear.' },
+                { icon: '⚡', title: 'Auto-fix PRs', desc: 'AgentBreaker opens a PR with the security fixes applied directly to your codebase.' },
+              ].map((item, i) => (
+                <div key={i} style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-card)' }}>
+                  <div style={{ fontSize: 16, marginBottom: 6 }}>{item.icon}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>{item.title}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>{item.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="footer" style={{ marginTop: 24 }}>Report ID: {id}</div>
         </div>
       </div>
@@ -472,6 +497,32 @@ export default function ReportPage() {
               </div>
             )
           })}
+        </div>
+
+        {/* Roadmap / What's Next */}
+        <div style={{
+          marginTop: 28, padding: '18px 20px',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border-subtle)',
+          background: 'var(--bg-secondary)',
+          animation: 'fadeInUp 0.4s ease-out',
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>
+            Roadmap — What&apos;s Next
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {[
+              { icon: '🔄', title: 'CI/CD Integration', desc: 'Run AgentBreaker as a GitHub Action on every deploy — fail the build if critical vulnerabilities are found.' },
+              { icon: '📡', title: 'Continuous Monitoring', desc: 'Schedule scans to run hourly against production endpoints and alert on new vulnerabilities.' },
+              { icon: '⚡', title: 'Dynamic Attack Gen', desc: 'Use Claude to generate custom attack vectors tailored to your specific agent\'s domain and capabilities.' },
+            ].map((item, i) => (
+              <div key={i} style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-card)' }}>
+                <div style={{ fontSize: 16, marginBottom: 6 }}>{item.icon}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>{item.title}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>{item.desc}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="footer" style={{ marginTop: 24 }}>

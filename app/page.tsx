@@ -404,6 +404,32 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Ethical use statement */}
+        <div style={{
+          maxWidth: 600, margin: '20px auto 0',
+          padding: '14px 18px',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid rgba(74,158,255,0.15)',
+          background: 'rgba(74,158,255,0.04)',
+          fontSize: 10,
+          color: 'var(--text-muted)',
+          lineHeight: 1.8,
+          animation: 'fadeInUp 0.5s ease-out 0.5s both',
+        }}>
+          <span style={{ color: 'var(--blue)', fontWeight: 600 }}>Responsible use: </span>
+          AgentBreaker is built for developers to test their own AI agents and applications.
+          Never use it against agents or systems you don&apos;t own or have explicit permission to test.
+          Security testing is only ethical when you&apos;re the one who built it, or have been asked to break it.
+        </div>
+
+        {/* Market context */}
+        <p style={{
+          textAlign: 'center', fontSize: 10, color: 'var(--text-muted)',
+          maxWidth: 600, margin: '14px auto 0', lineHeight: 1.7,
+        }}>
+          $52B AI agent market by 2030 — every deployment is a potential attack surface.
+        </p>
+
         <div className="footer">AgentBreaker — AI security testing for the vibe-code era</div>
       </div>
     </div>
