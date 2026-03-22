@@ -9,7 +9,7 @@ interface ScanLog {
 }
 
 interface ScanParams {
-  mode: 'website' | 'prompt' | 'code'
+  mode: 'website' | 'browser' | 'prompt' | 'code'
   targetUrl?: string
   endpointPath?: string
   format?: string
@@ -78,7 +78,13 @@ function ScanContent() {
             endpointPath: params.endpointPath || '',
             format: params.format || '',
           }
-          addLog({ text: '◆ Launching live attack sequence...', type: 'system' })
+          addLog({ text: '◆ Launching live API attack sequence...', type: 'system' })
+        } else if (params.mode === 'browser') {
+          apiEndpoint = '/api/scan-browser'
+          body = { targetUrl: params.targetUrl }
+          addLog({ text: `◇ Mode: Browser Attack via TinyFish`, type: 'info' })
+          addLog({ text: `◇ Target: ${params.targetUrl}`, type: 'info' })
+          addLog({ text: '◆ Launching real browser — navigating to target site...', type: 'system' })
         } else if (params.mode === 'prompt') {
           apiEndpoint = '/api/scan-stream'
           body = { systemPrompt: params.systemPrompt }
@@ -209,7 +215,7 @@ function ScanContent() {
   const modeLabel = (() => {
     try {
       const p: ScanParams = JSON.parse(sessionStorage.getItem('scan-params') || '{}')
-      return p.mode === 'website' ? 'Website Attack' : p.mode === 'code' ? 'Code Scan' : 'Prompt Scan'
+      return p.mode === 'website' ? 'API Attack' : p.mode === 'browser' ? 'Browser Attack' : p.mode === 'code' ? 'Code Scan' : 'Prompt Scan'
     } catch { return 'Security Scan' }
   })()
 

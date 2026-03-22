@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 import { v4 as uuidv4 } from 'uuid';
+import { getClient, MODELS } from '@/lib/ai-client';
 
 export const maxDuration = 120;
 export const dynamic = 'force-dynamic';
@@ -73,7 +73,7 @@ If no issues found, return [].`;
 
 export async function POST(req: NextRequest) {
   const reportId = uuidv4();
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const anthropic = getClient();
 
   const encoder = new TextEncoder();
 
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
 
         // Call Claude for analysis
         const response = await anthropic.messages.create({
-          model: 'claude-sonnet-4-6',
+          model: MODELS.sonnet,
           max_tokens: 4096,
           system: SYSTEM_PROMPT,
           messages: [

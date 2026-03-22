@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-type Mode = 'website' | 'prompt' | 'code'
+type Mode = 'website' | 'browser' | 'prompt' | 'code'
 
 export default function Home() {
   const router = useRouter()
@@ -55,6 +55,12 @@ export default function Home() {
       const params = { mode: 'website', targetUrl, endpointPath: endpointPath || '', format: probeResult?.format || '' }
       sessionStorage.setItem('scan-params', JSON.stringify(params))
       router.push('/scan')
+    } else if (mode === 'browser') {
+      if (!targetUrl.trim()) { setError('Enter a target URL'); return }
+      setLoading(true)
+      const params = { mode: 'browser', targetUrl }
+      sessionStorage.setItem('scan-params', JSON.stringify(params))
+      router.push('/scan')
     } else if (mode === 'prompt') {
       if (!systemPrompt.trim() || systemPrompt.trim().length < 10) { setError('System prompt too short (min 10 chars)'); return }
       setLoading(true)
@@ -71,7 +77,8 @@ export default function Home() {
   }
 
   const modeConfig: Record<Mode, { icon: string; label: string; desc: string }> = {
-    website: { icon: '🌐', label: 'Website', desc: 'Point at any live URL and break it' },
+    website: { icon: '🌐', label: 'API Attack', desc: 'Hit the raw AI endpoint with 57 attacks' },
+    browser: { icon: '🖥️', label: 'Browser Attack', desc: 'Real browser navigates & breaks the UI' },
     prompt: { icon: '🧠', label: 'System Prompt', desc: 'Test a prompt before deploying' },
     code: { icon: '📂', label: 'Code Scan', desc: 'CodeRabbit-style AI security review' },
   }
@@ -234,6 +241,42 @@ export default function Home() {
             </>
           )}
 
+          {/* ── BROWSER MODE (TinyFish) ── */}
+          {mode === 'browser' && (
+            <>
+              <div className="form-group">
+                <label className="form-label">
+                  <span className="form-label__icon">🖥️</span>
+                  Target URL
+                </label>
+                <input
+                  className="input"
+                  type="url"
+                  placeholder="http://localhost:3000  or  https://myapp.vercel.app"
+                  value={targetUrl}
+                  onChange={e => setTargetUrl(e.target.value)}
+                />
+              </div>
+
+              <div style={{
+                padding: '12px 14px', borderRadius: 'var(--radius-md)',
+                border: '1px solid rgba(167,139,250,0.2)',
+                background: 'rgba(167,139,250,0.06)',
+                fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.8, marginBottom: 20,
+              }}>
+                <div style={{ color: 'var(--purple)', fontWeight: 600, marginBottom: 6, fontSize: 11 }}>
+                  🖥️ Powered by TinyFish Web Agent
+                </div>
+                A real browser navigates to your website, finds the AI chat widget, types each attack payload into it,
+                and reads the response — exactly like a real attacker would. Works on any vibe-coded site built with
+                v0, Lovable, Bolt, or Cursor, even if there&apos;s no raw API endpoint.
+                <div style={{ marginTop: 8, color: 'rgba(255,255,255,0.3)' }}>
+                  Requires: <code style={{ fontSize: 10 }}>TINYFISH_API_KEY</code> in .env.local
+                </div>
+              </div>
+            </>
+          )}
+
           {/* ── PROMPT MODE ── */}
           {mode === 'prompt' && (
             <>
@@ -348,6 +391,8 @@ export default function Home() {
               <><span className="spinner" /> Starting scan...</>
             ) : mode === 'website' ? (
               <>⚡ Break This Website</>
+            ) : mode === 'browser' ? (
+              <>🖥️ Launch Browser Attack</>
             ) : mode === 'prompt' ? (
               <>⚡ Attack This Prompt</>
             ) : (

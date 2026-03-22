@@ -11,10 +11,18 @@
     "start": "next start",
     "lint": "next lint"
   },
-  "keywords": ["ai", "security", "llm", "prompt-injection", "testing", "agentbreaker"],
+  "keywords": [
+    "ai",
+    "security",
+    "llm",
+    "prompt-injection",
+    "testing",
+    "agentbreaker"
+  ],
   "author": "AgentBreaker",
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/bedrock-sdk": "^0.26.4",
     "@anthropic-ai/sdk": "^0.80.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
