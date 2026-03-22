@@ -18,22 +18,19 @@ export default function LoadingScreen({ onComplete }: Props) {
   }, [onComplete])
 
   useEffect(() => {
-    let frame: number
-    let start: number | null = null
-    const duration = 2200
-
-    const tick = (now: number) => {
-      if (!start) start = now
-      const elapsed = now - start
-      const raw = Math.min(elapsed / duration, 1)
-      const chunked = Math.floor(raw * 20) * 5
-      setPct(chunked)
-      if (chunked >= 100) { handleComplete(); return }
-      frame = requestAnimationFrame(tick)
-    }
-
-    frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
+    // Step through 0→100 in 5% increments every 110ms = ~2.2s total
+    const steps = 20
+    const stepMs = 110
+    let step = 0
+    const interval = setInterval(() => {
+      step++
+      setPct(step * 5)
+      if (step >= steps) {
+        clearInterval(interval)
+        handleComplete()
+      }
+    }, stepMs)
+    return () => clearInterval(interval)
   }, [handleComplete])
 
   if (phase === 'done') return null
