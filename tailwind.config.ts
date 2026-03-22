@@ -31,8 +31,8 @@ const config: Config = {
         "agent-green": "hsl(var(--agent-green))",
       },
       fontFamily: {
-        mono:    ["var(--font-mono)", "IBM Plex Mono", "monospace"],
-        display: ["var(--font-display)", "Space Grotesk", "sans-serif"],
+        mono:    ["IBM Plex Mono", "monospace"],
+        display: ["Space Grotesk", "sans-serif"],
       },
       borderRadius: {
         DEFAULT: "0px",
