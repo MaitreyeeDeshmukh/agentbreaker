@@ -1,13 +1,19 @@
 {
   "name": "agentbreaker",
   "version": "0.1.0",
-  "private": true,
+  "description": "AI agent security testing platform — break your AI before hackers do",
+  "bin": {
+    "agentbreaker": "./bin/agentbreaker.js"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
+  "keywords": ["ai", "security", "llm", "prompt-injection", "testing", "agentbreaker"],
+  "author": "AgentBreaker",
+  "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
     "html2canvas": "^1.4.1",
