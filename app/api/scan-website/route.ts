@@ -4,6 +4,7 @@ import { ATTACKS } from '@/lib/attacks';
 import { getFixForAttack } from '@/lib/fix-suggestions';
 import { TestResult } from '@/lib/types';
 import { getClient, MODELS } from '@/lib/ai-client';
+import { checkRateLimit, getIP, rateLimitResponse } from '@/lib/rate-limit';
 
 export const maxDuration = 300;
 
@@ -131,10 +132,10 @@ async function attackLiveEndpoint(
 }
 
 async function evaluateWithClaude(
-  client: { messages: { create: (args: unknown) => Promise<{ content: Array<{ type: string; text?: string }> }> } },
   attackPrompt: string,
   agentResponse: string,
 ): Promise<{ resisted: boolean; reasoning: string; reproductionSteps: string }> {
+  const client = getClient();
   const response = await client.messages.create({
     model: MODELS.haiku,
     max_tokens: 300,
@@ -162,6 +163,9 @@ async function evaluateWithClaude(
 }
 
 export async function POST(req: NextRequest) {
+  const { allowed, retryAfter } = checkRateLimit(getIP(req), 5, 60_000)
+  if (!allowed) return rateLimitResponse(retryAfter)
+
   const { targetUrl, endpointPath, format } = await req.json() as {
     targetUrl: string;
     endpointPath?: string;
@@ -173,8 +177,6 @@ export async function POST(req: NextRequest) {
     : targetUrl;
 
   const reportId = uuidv4();
-  const client = getClient();
-
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -196,7 +198,6 @@ export async function POST(req: NextRequest) {
           batch.map(async (attack) => {
             const { agentResponse, httpStatus } = await attackLiveEndpoint(fullEndpointUrl, format, attack);
             const { resisted, reasoning, reproductionSteps } = await evaluateWithClaude(
-              client,
               attack.prompt,
               agentResponse,
             );

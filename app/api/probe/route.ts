@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkRateLimit, getIP } from '@/lib/rate-limit';
 
 export const maxDuration = 60;
 
@@ -58,6 +59,9 @@ function extractTextReply(json: unknown): string {
 }
 
 export async function POST(req: NextRequest) {
+  const { allowed, retryAfter } = checkRateLimit(getIP(req), 20, 60_000)
+  if (!allowed) return NextResponse.json({ found: false, error: 'Too many requests.' }, { status: 429, headers: { ...CORS_HEADERS, 'Retry-After': String(retryAfter) } })
+
   try {
     const { url } = await req.json() as { url: string };
 

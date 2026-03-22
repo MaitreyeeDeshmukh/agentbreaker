@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { ATTACKS } from '@/lib/attacks';
+import { checkRateLimit, getIP } from '@/lib/rate-limit';
 import { getFixForAttack } from '@/lib/fix-suggestions';
 import { getClient, MODELS } from '@/lib/ai-client';
 
@@ -91,7 +92,7 @@ async function evaluateResponse(
     ],
   });
 
-  const raw = evalMsg.content[0].type === 'text' ? evalMsg.content[0].text : '';
+  const raw = evalMsg.content[0].type === 'text' ? (evalMsg.content[0].text ?? '') : '';
   try {
     return JSON.parse(raw);
   } catch {
@@ -100,6 +101,9 @@ async function evaluateResponse(
 }
 
 export async function POST(req: NextRequest) {
+  const { allowed, retryAfter } = checkRateLimit(getIP(req), 10, 60_000)
+  if (!allowed) return NextResponse.json({ error: 'Too many requests. Please slow down.' }, { status: 429, headers: { ...corsHeaders, 'Retry-After': String(retryAfter) } })
+
   try {
     const body = await req.json();
     const { systemPrompt, agentUrl } = body as { systemPrompt: string; agentUrl?: string };
@@ -131,7 +135,7 @@ export async function POST(req: NextRequest) {
               system: systemPrompt,
               messages: [{ role: 'user', content: attack.prompt }],
             });
-            agentResponse = msg.content[0].type === 'text' ? msg.content[0].text : '';
+            agentResponse = msg.content[0].type === 'text' ? (msg.content[0].text ?? '') : '';
           }
 
           const evaluation = await evaluateResponse(attack.prompt, agentResponse);

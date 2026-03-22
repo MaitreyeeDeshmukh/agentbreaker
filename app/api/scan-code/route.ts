@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { getClient, MODELS } from '@/lib/ai-client';
+import { checkRateLimit, getIP, rateLimitResponse } from '@/lib/rate-limit';
 
 export const maxDuration = 120;
 export const dynamic = 'force-dynamic';
@@ -72,6 +73,9 @@ Return ONLY a JSON array. No markdown. No explanation. Just the raw JSON array.
 If no issues found, return [].`;
 
 export async function POST(req: NextRequest) {
+  const { allowed, retryAfter } = checkRateLimit(getIP(req), 5, 60_000)
+  if (!allowed) return rateLimitResponse(retryAfter)
+
   const reportId = uuidv4();
   const anthropic = getClient();
 
@@ -119,7 +123,7 @@ export async function POST(req: NextRequest) {
         send({ type: 'progress', message: 'Checking authentication & rate limiting...' });
         send({ type: 'progress', message: 'Reviewing API key handling...' });
 
-        const rawText = response.content[0].type === 'text' ? response.content[0].text : '[]';
+        const rawText = response.content[0].type === 'text' ? (response.content[0].text ?? '[]') : '[]';
 
         let issues: CodeIssue[] = [];
         try {
