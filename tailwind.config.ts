@@ -10,25 +10,25 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        background: "#000000",
+        foreground: "#ffffff",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "#e5503d",
+          foreground: "#ffffff",
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: "#0d0d14",
+          foreground: "#ffffff",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: "#0e0e11",
+          foreground: "#595959",
         },
-        border: "hsl(var(--border))",
-        "agent-red":   "hsl(var(--agent-red))",
-        "agent-amber": "hsl(var(--agent-amber))",
-        "agent-blue":  "hsl(var(--agent-blue))",
-        "agent-green": "hsl(var(--agent-green))",
+        border: "rgba(255,255,255,0.06)",
+        "agent-red":   "#e5503d",
+        "agent-amber": "#f5a623",
+        "agent-blue":  "#4da6ff",
+        "agent-green": "#4dd97a",
       },
       fontFamily: {
         mono:    ["IBM Plex Mono", "monospace"],

@@ -22,11 +22,15 @@
 
   * {
     border-color: hsl(0 0% 100% / 0.06);
+    forced-color-adjust: none;
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply antialiased;
+    background-color: #000000;
+    color: #ffffff;
     font-family: 'IBM Plex Mono', monospace;
+    forced-color-adjust: none;
   }
 
   /* Grain texture */
@@ -54,6 +58,23 @@
   .scan-cursor {
     cursor: crosshair;
   }
+  /* Fix broken CSS variable colors — Tailwind generates var(--x) but vars hold raw HSL channels */
+  .bg-background  { background-color: #000000 !important; }
+  .bg-card        { background-color: hsl(240 10% 5%) !important; }
+  .bg-muted       { background-color: hsl(240 5% 7%) !important; }
+  .bg-primary     { background-color: hsl(1 72% 59%) !important; }
+  .text-foreground      { color: #ffffff !important; }
+  .text-primary         { color: hsl(1 72% 59%) !important; }
+  .text-muted-foreground { color: hsl(0 0% 35%) !important; }
+  .text-agent-red   { color: hsl(1 72% 59%) !important; }
+  .text-agent-amber { color: hsl(37 91% 55%) !important; }
+  .text-agent-blue  { color: hsl(214 100% 65%) !important; }
+  .text-agent-green { color: hsl(145 64% 55%) !important; }
+  .border-l-primary     { border-left-color: hsl(1 72% 59%) !important; }
+  .border-l-agent-green { border-left-color: hsl(145 64% 55%) !important; }
+  .border-l-agent-blue  { border-left-color: hsl(214 100% 65%) !important; }
+  .border-l-agent-amber { border-left-color: hsl(37 91% 55%) !important; }
+  .bg-agent-green { background-color: hsl(145 64% 55%) !important; }
 }
 
 /* ── Keyframe animations ── */

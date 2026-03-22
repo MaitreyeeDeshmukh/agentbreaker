@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Shield, Globe, Terminal, FileCode, LayoutDashboard, ArrowRight } from 'lucide-react'
+import { Shield, Globe, Terminal, FileCode, LayoutDashboard, ArrowRight, X } from 'lucide-react'
 import LoadingScreen from './components/LoadingScreen'
 import Nav from './components/Nav'
 
@@ -19,7 +19,7 @@ const features = [
     badge: 'MAIN FEATURE',
     color: 'text-agent-green',
     borderColor: 'border-l-agent-green',
-    desc: 'A real browser navigates your live web app and types adversarial prompts into every chat, form, and input field. Tests your actual product — not just an API.',
+    desc: 'A real browser navigates your live web app and types adversarial prompts into every chat, form, and input field. Tests your actual product, not just an API.',
   },
   {
     icon: Terminal,
@@ -93,8 +93,16 @@ function HolesTypewriter() {
   )
 }
 
+const ATTACK_OPTIONS = [
+  { icon: Globe,     label: 'Browser Attack', href: '/attack/browser', color: 'text-agent-green', borderColor: 'border-l-agent-green', badge: 'MAIN', desc: 'Real browser navigates your live app and tests every input.' },
+  { icon: Terminal,  label: 'Prompt Scan',    href: '/attack/prompt',  color: 'text-primary',     borderColor: 'border-l-primary',     badge: null,   desc: 'Fire 57 jailbreaks at your system prompt and find every hole.' },
+  { icon: Shield,    label: 'API Attack',     href: '/attack/api',     color: 'text-agent-blue',  borderColor: 'border-l-agent-blue',  badge: null,   desc: 'Send adversarial payloads to your AI API endpoint.' },
+  { icon: FileCode,  label: 'Code Scan',      href: '/attack/code',    color: 'text-agent-amber', borderColor: 'border-l-agent-amber', badge: null,   desc: 'Static analysis for injection sinks and unsafe patterns.' },
+]
+
 export default function Home() {
   const [loaded, setLoaded] = useState(false)
+  const [scanModalOpen, setScanModalOpen] = useState(false)
   const stat0 = useTickUp(73,  loaded ? 1800 : 99999)
   const stat1 = useTickUp(540, loaded ? 1900 : 99999)
 
@@ -105,13 +113,52 @@ export default function Home() {
       <Nav transparent />
 
       {/* Fixed SCAN NOW button */}
-      <Link
-        href="/attack/browser"
+      <button
+        onClick={() => setScanModalOpen(true)}
         className="fixed bottom-8 right-8 z-50 w-28 h-28 bg-primary text-white border-2 border-white flex items-center justify-center text-[10px] font-bold uppercase tracking-widest font-display hover:bg-white hover:text-primary active:scale-95 rounded-full text-center leading-tight"
         style={{ transition: 'background 0ms, color 0ms, transform 100ms', animation: 'fade-in-simple 0.4s ease-out forwards', animationDelay: '1200ms', opacity: 0 }}
       >
         SCAN<br />NOW
-      </Link>
+      </button>
+
+      {/* Attack selector modal */}
+      {scanModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-6" style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)' }}>
+          <div className="w-full max-w-2xl" style={{ animation: 'snap-up 0.2s ease-out forwards' }}>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-mono mb-1">SELECT ATTACK TYPE</div>
+                <h2 className="text-[clamp(1.5rem,4vw,2.5rem)] font-display font-black uppercase leading-none text-white">Choose Your Vector</h2>
+              </div>
+              <button onClick={() => setScanModalOpen(false)} className="text-white/40 hover:text-white p-2">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-[hsl(0_0%_100%/0.08)]">
+              {ATTACK_OPTIONS.map((opt) => {
+                const Icon = opt.icon
+                return (
+                  <Link
+                    key={opt.href}
+                    href={opt.href}
+                    onClick={() => setScanModalOpen(false)}
+                    className={`group bg-background border-l-2 ${opt.borderColor} px-6 py-6 flex flex-col gap-3 hover:bg-card`}
+                    style={{ transition: 'background 0ms' }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className={`w-4 h-4 ${opt.color}`} />
+                      <span className={`text-[11px] font-mono font-bold uppercase tracking-[0.15em] ${opt.color}`}>{opt.label}</span>
+                      {opt.badge && <span className="text-[9px] bg-primary text-white px-1.5 py-0.5 font-mono font-bold uppercase tracking-widest">{opt.badge}</span>}
+                    </div>
+                    <p className="text-[12px] text-white/50 font-mono leading-[1.5]">{opt.desc}</p>
+                    <span className={`text-[10px] font-mono uppercase tracking-wider ${opt.color} group-hover:underline mt-auto`}>Start →</span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── HERO ── */}
       <section className="min-h-screen flex flex-col md:flex-row items-start px-8 pt-[80px] pb-16 relative overflow-hidden">
@@ -120,7 +167,7 @@ export default function Home() {
             className="text-[clamp(3.5rem,12vw,8rem)] font-display font-black uppercase leading-[0.9] tracking-[-0.02em] text-white"
             style={{ animation: 'crash-in-left 0.6s ease-out forwards', transform: 'translateX(-100vw)' }}
           >
-            YOUR AI<br />AGENT HAS
+            YOUR VIBECODED<br />PLATFORM HAS
           </h1>
           <HolesTypewriter />
         </div>
@@ -128,7 +175,7 @@ export default function Home() {
         <div className="flex-[3] flex flex-col justify-start gap-8 md:pl-12 pt-[100px]" style={{ animation: 'fade-in-simple 0.4s ease-out forwards', animationDelay: '1000ms', opacity: 0 }}>
           <span className="text-[10px] uppercase tracking-[0.15em] text-white/50 font-mono">01 / WHAT IT DOES</span>
           <p className="text-[14px] text-white leading-[1.6] font-mono max-w-[380px]">
-            AgentBreaker runs 57 real adversarial attacks against your AI agent — prompt injections, jailbreaks, goal hijacking, data exfiltration — and gives you a step-by-step fix report.
+            AgentBreaker runs 57 real adversarial attacks against your AI agent: prompt injections, jailbreaks, goal hijacking, data exfiltration. Every hole gets a step-by-step fix report.
           </p>
           <div className="flex items-baseline gap-6 flex-wrap">
             {stats.map((s, i) => (
@@ -195,7 +242,7 @@ export default function Home() {
             <LayoutDashboard className="w-5 h-5 text-white/50 group-hover:text-white" style={{ transition: 'color 0ms' }} />
             <div>
               <div className="text-[13px] font-display font-bold uppercase tracking-wider text-white">View Past Scans</div>
-              <div className="text-[11px] font-mono text-white/40 mt-0.5">Dashboard — all your previous security reports</div>
+              <div className="text-[11px] font-mono text-white/40 mt-0.5">Dashboard · all your previous security reports</div>
             </div>
           </div>
           <ArrowRight className="w-5 h-5 text-white/30 group-hover:text-white" style={{ transition: 'color 0ms' }} />

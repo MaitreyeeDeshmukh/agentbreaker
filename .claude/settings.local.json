@@ -7,7 +7,9 @@
       "Skill(update-config)",
       "Skill(update-config:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(tasklist)",
+      "Bash(timeout 8 npx next dev -p 3002)"
     ]
   }
 }
