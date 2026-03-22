@@ -1,482 +1,363 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { Shield } from 'lucide-react'
+import LoadingScreen from './components/LoadingScreen'
 
-type Mode = 'website' | 'browser' | 'prompt' | 'code'
+type ScanMode = 'prompt' | 'website' | 'browser' | 'code'
+
+const stats = [
+  { num: 73,  suffix: '%',  desc: 'of production agents vulnerable' },
+  { num: 540, suffix: '%',  desc: 'YoY increase in AI security reports' },
+  { prefix: '#', num: 1, suffix: '', desc: 'OWASP #1 LLM vulnerability' },
+]
+
+const categories = [
+  { count: 15, label: 'Prompt Injection',  borderColor: 'border-l-agent-red' },
+  { count: 12, label: 'Goal Hijacking',    borderColor: 'border-l-agent-amber' },
+  { count: 12, label: 'Data Exfiltration', borderColor: 'border-l-agent-blue' },
+  { count: 11, label: 'Tool Misuse',       borderColor: 'border-l-agent-green' },
+]
+
+const MODES: { id: ScanMode; short: string }[] = [
+  { id: 'prompt',  short: 'PROMPT' },
+  { id: 'website', short: 'API' },
+  { id: 'browser', short: 'BROWSER' },
+  { id: 'code',    short: 'CODE' },
+]
+
+function useTickUp(target: number, duration = 1500, delay = 800) {
+  const [val, setVal] = useState(0)
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      const start = performance.now()
+      const tick = (now: number) => {
+        const elapsed = now - start
+        const progress = Math.min(elapsed / duration, 1)
+        setVal(Math.floor(progress * target))
+        if (progress < 1) requestAnimationFrame(tick)
+        else setVal(target)
+      }
+      requestAnimationFrame(tick)
+    }, delay)
+    return () => clearTimeout(timeout)
+  }, [target, duration, delay])
+  return val
+}
+
+const HOLES_LETTERS = ['H', 'O', 'L', 'E', 'S', '.']
+
+function HolesTypewriter() {
+  const [count, setCount] = useState(0)
+  const [showCursor, setShowCursor] = useState(true)
+
+  useEffect(() => {
+    const startDelay = setTimeout(() => {
+      let i = 0
+      const interval = setInterval(() => {
+        i++
+        setCount(i)
+        if (i >= HOLES_LETTERS.length) {
+          clearInterval(interval)
+          setTimeout(() => setShowCursor(false), 1000)
+        }
+      }, 80)
+      return () => clearInterval(interval)
+    }, 600)
+    return () => clearTimeout(startDelay)
+  }, [])
+
+  return (
+    <h1
+      className="text-[clamp(3.5rem,12vw,8rem)] font-display font-black uppercase leading-[0.9] tracking-[-0.02em]"
+      style={{ color: 'hsl(var(--primary))' }}
+    >
+      {HOLES_LETTERS.slice(0, count).join('')}
+      {showCursor && (
+        <span
+          className="inline-block w-[0.06em] bg-primary ml-[0.02em] align-baseline"
+          style={{ height: '0.85em', animation: 'cursor-blink 0.6s step-end infinite' }}
+        />
+      )}
+    </h1>
+  )
+}
 
 export default function Home() {
   const router = useRouter()
-  const [mode, setMode] = useState<Mode>('website')
-
-  // Website mode
+  const [loaded, setLoaded]       = useState(false)
+  const [menuOpen, setMenuOpen]   = useState(false)
+  const [mode, setMode]           = useState<ScanMode>('prompt')
+  const [focused, setFocused]     = useState(false)
+  const [systemPrompt, setSystemPrompt] = useState('')
   const [targetUrl, setTargetUrl] = useState('')
   const [endpointPath, setEndpointPath] = useState('')
-  const [probing, setProbing] = useState(false)
-  const [probeResult, setProbeResult] = useState<{ found: boolean; endpoint?: string; format?: string; error?: string } | null>(null)
+  const [format, setFormat]       = useState('')
+  const [probing, setProbing]     = useState(false)
+  const [probeResult, setProbeResult] = useState<{ found: boolean; endpoint?: string; format?: string } | null>(null)
+  const [code, setCode]           = useState('')
+  const [language, setLanguage]   = useState('typescript')
 
-  // Prompt mode
-  const [systemPrompt, setSystemPrompt] = useState('')
+  const onLoadComplete = useCallback(() => setLoaded(true), [])
+  const stat0 = useTickUp(73,  1200, loaded ? 1800 : 99999)
+  const stat1 = useTickUp(540, 1200, loaded ? 1800 : 99999)
 
-  // Code mode
-  const [code, setCode] = useState('')
-  const [language, setLanguage] = useState('')
-  const [filename, setFilename] = useState('')
+  const canScan = () => {
+    if (mode === 'prompt')  return systemPrompt.trim().length >= 10
+    if (mode === 'website') return targetUrl.trim().length > 0
+    if (mode === 'browser') return targetUrl.trim().length > 0
+    if (mode === 'code')    return code.trim().length > 0
+    return false
+  }
 
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  const probe = async () => {
-    if (!targetUrl.trim()) { setError('Enter a URL to probe'); return }
-    setError('')
+  const handleProbe = async () => {
+    if (!targetUrl.trim()) return
     setProbing(true)
     setProbeResult(null)
     try {
-      const res = await fetch('/api/probe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: targetUrl }),
-      })
+      const res  = await fetch('/api/probe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: targetUrl }) })
       const data = await res.json()
       setProbeResult(data)
-      if (data.found && data.endpoint) setEndpointPath(data.endpoint)
-    } catch {
-      setProbeResult({ found: false, error: 'Failed to probe URL' })
-    } finally {
-      setProbing(false)
-    }
+      if (data.found) { setEndpointPath(new URL(data.endpoint).pathname); setFormat(data.format || '') }
+    } catch { setProbeResult({ found: false }) }
+    finally { setProbing(false) }
   }
 
-  const run = async () => {
-    setError('')
-
-    if (mode === 'website') {
-      if (!targetUrl.trim()) { setError('Enter a target URL'); return }
-      setLoading(true)
-      const params = { mode: 'website', targetUrl, endpointPath: endpointPath || '', format: probeResult?.format || '' }
-      sessionStorage.setItem('scan-params', JSON.stringify(params))
-      router.push('/scan')
-    } else if (mode === 'browser') {
-      if (!targetUrl.trim()) { setError('Enter a target URL'); return }
-      setLoading(true)
-      const params = { mode: 'browser', targetUrl }
-      sessionStorage.setItem('scan-params', JSON.stringify(params))
-      router.push('/scan')
-    } else if (mode === 'prompt') {
-      if (!systemPrompt.trim() || systemPrompt.trim().length < 10) { setError('System prompt too short (min 10 chars)'); return }
-      setLoading(true)
-      const params = { mode: 'prompt', systemPrompt }
-      sessionStorage.setItem('scan-params', JSON.stringify(params))
-      router.push('/scan')
-    } else {
-      if (!code.trim() || code.trim().length < 20) { setError('Paste some code to analyze (min 20 chars)'); return }
-      setLoading(true)
-      const params = { mode: 'code', code, language, filename }
-      sessionStorage.setItem('scan-params', JSON.stringify(params))
-      router.push('/scan')
-    }
+  const runScan = () => {
+    if (!canScan()) return
+    const params =
+      mode === 'prompt'  ? { mode, systemPrompt } :
+      mode === 'website' ? { mode, targetUrl, endpointPath, format } :
+      mode === 'browser' ? { mode, targetUrl } :
+      { mode, code, language }
+    sessionStorage.setItem('scan-params', JSON.stringify(params))
+    router.push('/scan')
   }
 
-  const modeConfig: Record<Mode, { icon: string; label: string; desc: string }> = {
-    website: { icon: '🌐', label: 'API Attack', desc: 'Hit the raw AI endpoint with 57 attacks' },
-    browser: { icon: '🖥️', label: 'Browser Attack', desc: 'Real browser navigates & breaks the UI' },
-    prompt: { icon: '🧠', label: 'System Prompt', desc: 'Test a prompt before deploying' },
-    code: { icon: '📂', label: 'Code Scan', desc: 'CodeRabbit-style AI security review' },
-  }
+  if (!loaded) return <LoadingScreen onComplete={onLoadComplete} />
+
+  const BORDER = 'border-[hsl(0_0%_100%/0.06)]'
 
   return (
-    <div className="page-wrapper">
-      <div className="bg-grid" />
-      <div className="bg-gradient-spot bg-gradient-spot--red" />
-      <div className="bg-gradient-spot bg-gradient-spot--blue" />
+    <div className="min-h-screen flex flex-col relative bg-background">
 
-      <nav className="nav">
-        <div className="nav__brand">
-          <div className="nav__logo">⚡</div>
-          <span className="nav__title">AgentBreaker</span>
-        </div>
-        <button className="btn btn--ghost" onClick={() => router.push('/demo')}>
-          Live Demo →
+      {/* Fixed SCAN NOW button */}
+      <button
+        onClick={runScan}
+        className="fixed bottom-8 right-8 z-50 w-20 h-20 bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold uppercase tracking-widest font-display hover:bg-foreground hover:text-background active:scale-95 rounded-full"
+        style={{ transition: 'background 0ms, color 0ms, transform 100ms', animation: 'fade-in-simple 0.4s ease-out forwards', animationDelay: '1200ms', opacity: 0 }}
+      >
+        SCAN<br />NOW
+      </button>
+
+      {/* Nav */}
+      <nav
+        className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-8 py-6"
+        style={{ animation: 'fade-in-simple 0.4s ease-out forwards', animationDelay: '1200ms', opacity: 0 }}
+      >
+        <button
+          onClick={() => setMenuOpen(true)}
+          className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground font-mono"
+          style={{ transition: 'color 0ms' }}
+        >
+          ≡ MENU
         </button>
+        <span className="text-[11px] uppercase tracking-[0.15em] text-foreground font-display font-bold">AGENTBREAKER</span>
       </nav>
 
-      <div className="page-container">
-        <div className="page-hero">
-          <div className="hero__badge">AI Security Testing</div>
-          <h1 className="hero__title">
-            Break your AI<br />
-            <span>before hackers do.</span>
-          </h1>
-          <p className="hero__subtitle">
-            Point at any website, system prompt, or codebase — run 57 adversarial attacks
-            and get a step-by-step fix report.
-          </p>
-        </div>
-
-        {/* Mode Tabs */}
-        <div style={{
-          display: 'flex', gap: 6, maxWidth: 600, margin: '0 auto 20px',
-          background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)',
-          padding: 5, border: '1px solid var(--border-subtle)',
-          animation: 'fadeInUp 0.5s ease-out 0.1s both',
-        }}>
-          {(Object.keys(modeConfig) as Mode[]).map(m => (
-            <button
-              key={m}
-              onClick={() => { setMode(m); setError(''); setProbeResult(null) }}
-              style={{
-                flex: 1,
-                padding: '10px 8px',
-                borderRadius: 'var(--radius-md)',
-                border: 'none',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                background: mode === m ? 'var(--bg-card)' : 'transparent',
-                color: mode === m ? 'var(--text-primary)' : 'var(--text-muted)',
-                boxShadow: mode === m ? 'var(--shadow-card)' : 'none',
-                borderColor: mode === m ? 'var(--border-default)' : 'transparent',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}
-            >
-              <span style={{ fontSize: 14 }}>{modeConfig[m].icon}</span>
-              <span>{modeConfig[m].label}</span>
-            </button>
+      {/* Menu overlay */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-[60] bg-background flex flex-col items-start justify-center px-12 gap-4">
+          <button onClick={() => setMenuOpen(false)} className="absolute top-6 left-8 text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground font-mono">✕ CLOSE</button>
+          {[['Home', '/'], ['Scan', '/scan'], ['Demo', '/demo']].map(([label, href]) => (
+            <a key={href} href={href} onClick={() => setMenuOpen(false)}
+              className="text-5xl md:text-7xl font-display font-black uppercase tracking-tight text-foreground hover:text-primary"
+              style={{ transition: 'color 0ms' }}>
+              {label}
+            </a>
           ))}
         </div>
+      )}
 
-        {/* Mode description */}
-        <p style={{
-          textAlign: 'center', fontSize: 11, color: 'var(--text-muted)',
-          marginBottom: 24, animation: 'fadeIn 0.3s ease-out',
-          letterSpacing: '0.04em',
-        }}>
-          {modeConfig[mode].desc}
-        </p>
-
-        {/* Form Card */}
-        <div className="card" style={{ maxWidth: 600, margin: '0 auto', animation: 'fadeInUp 0.5s ease-out 0.15s both' }}>
-
-          {/* ── WEBSITE MODE ── */}
-          {mode === 'website' && (
-            <>
-              <div className="form-group">
-                <label className="form-label">
-                  <span className="form-label__icon">🌐</span>
-                  Target URL
-                </label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    className="input"
-                    type="url"
-                    placeholder="http://localhost:3000  or  https://myapp.vercel.app"
-                    value={targetUrl}
-                    onChange={e => { setTargetUrl(e.target.value); setProbeResult(null) }}
-                    style={{ flex: 1 }}
-                  />
-                  <button
-                    className="btn btn--ghost"
-                    onClick={probe}
-                    disabled={probing}
-                    style={{ whiteSpace: 'nowrap', padding: '0 16px' }}
-                  >
-                    {probing ? <><span className="spinner" style={{ width: 12, height: 12, borderWidth: 1.5, borderTopColor: 'var(--text-secondary)' }} /> Probing...</> : '🔍 Auto-detect'}
-                  </button>
-                </div>
-                <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6 }}>
-                  Works with localhost, Vercel, Render, Railway, or any deployed URL
-                </p>
-              </div>
-
-              {/* Probe result */}
-              {probeResult && (
-                <div style={{
-                  padding: '12px 14px',
-                  borderRadius: 'var(--radius-md)',
-                  marginBottom: 16,
-                  fontSize: 11,
-                  border: `1px solid ${probeResult.found ? 'rgba(61,220,132,0.2)' : 'rgba(226,75,74,0.2)'}`,
-                  background: probeResult.found ? 'var(--green-bg)' : 'var(--red-bg)',
-                  color: probeResult.found ? 'var(--green)' : 'var(--red)',
-                  animation: 'fadeInUp 0.3s ease-out',
-                }}>
-                  {probeResult.found ? (
-                    <>✓ Found endpoint: <strong>{probeResult.endpoint}</strong> (format: {probeResult.format})</>
-                  ) : (
-                    <>✗ {probeResult.error || 'No AI endpoint found — enter the path manually below'}</>
-                  )}
-                </div>
-              )}
-
-              <div className="form-group">
-                <label className="form-label">
-                  <span className="form-label__icon">📡</span>
-                  Endpoint Path
-                  <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 400, letterSpacing: 0, textTransform: 'none' }}>(auto-filled or enter manually)</span>
-                </label>
-                <input
-                  className="input"
-                  type="text"
-                  placeholder="/api/chat  or  /api/message  or  /chat"
-                  value={endpointPath}
-                  onChange={e => setEndpointPath(e.target.value)}
-                />
-              </div>
-
-              <div style={{
-                padding: '10px 14px',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-subtle)',
-                background: 'var(--bg-elevated)',
-                fontSize: 10,
-                color: 'var(--text-muted)',
-                lineHeight: 1.7,
-                marginBottom: 20,
-              }}>
-                <strong style={{ color: 'var(--text-secondary)' }}>How it works:</strong> AgentBreaker will send 57 real attack payloads (prompt injection,
-                goal hijacking, data exfiltration, tool misuse) via HTTP to your AI endpoint, record every response,
-                and tell you exactly what broke and how to fix it.
-              </div>
-            </>
-          )}
-
-          {/* ── BROWSER MODE (TinyFish) ── */}
-          {mode === 'browser' && (
-            <>
-              <div className="form-group">
-                <label className="form-label">
-                  <span className="form-label__icon">🖥️</span>
-                  Target URL
-                </label>
-                <input
-                  className="input"
-                  type="url"
-                  placeholder="http://localhost:3000  or  https://myapp.vercel.app"
-                  value={targetUrl}
-                  onChange={e => setTargetUrl(e.target.value)}
-                />
-              </div>
-
-              <div style={{
-                padding: '12px 14px', borderRadius: 'var(--radius-md)',
-                border: '1px solid rgba(167,139,250,0.2)',
-                background: 'rgba(167,139,250,0.06)',
-                fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.8, marginBottom: 20,
-              }}>
-                <div style={{ color: 'var(--purple)', fontWeight: 600, marginBottom: 6, fontSize: 11 }}>
-                  🖥️ Powered by TinyFish Web Agent
-                </div>
-                A real browser navigates to your website, finds the AI chat widget, types each attack payload into it,
-                and reads the response — exactly like a real attacker would. Works on any vibe-coded site built with
-                v0, Lovable, Bolt, or Cursor, even if there&apos;s no raw API endpoint.
-                <div style={{ marginTop: 8, color: 'rgba(255,255,255,0.3)' }}>
-                  Requires: <code style={{ fontSize: 10 }}>TINYFISH_API_KEY</code> in .env.local
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ── PROMPT MODE ── */}
-          {mode === 'prompt' && (
-            <>
-              <div className="form-group">
-                <label className="form-label">
-                  <span className="form-label__icon">🧠</span>
-                  System Prompt
-                </label>
-                <textarea
-                  className={`input input--textarea ${error && !systemPrompt.trim() ? 'input--error' : ''}`}
-                  placeholder="Paste your agent's system prompt here — e.g., 'You are a helpful customer support agent for Acme Corp...'"
-                  value={systemPrompt}
-                  onChange={e => setSystemPrompt(e.target.value)}
-                  style={{ minHeight: 160 }}
-                />
-              </div>
-              <div style={{
-                padding: '10px 14px',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-subtle)',
-                background: 'var(--bg-elevated)',
-                fontSize: 10,
-                color: 'var(--text-muted)',
-                lineHeight: 1.7,
-                marginBottom: 20,
-              }}>
-                <strong style={{ color: 'var(--text-secondary)' }}>How it works:</strong> AgentBreaker simulates your agent using this system prompt
-                and attacks it with 57 adversarial prompts, then gives you a security report with fixes you can paste right back into your prompt.
-              </div>
-            </>
-          )}
-
-          {/* ── CODE MODE ── */}
-          {mode === 'code' && (
-            <>
-              <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-                <div style={{ flex: 1 }}>
-                  <label className="form-label">
-                    <span className="form-label__icon">📝</span>
-                    Language
-                    <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 400, letterSpacing: 0, textTransform: 'none' }}>(optional)</span>
-                  </label>
-                  <input
-                    className="input"
-                    type="text"
-                    placeholder="TypeScript, Python, JS..."
-                    value={language}
-                    onChange={e => setLanguage(e.target.value)}
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label className="form-label">
-                    <span className="form-label__icon">📂</span>
-                    Filename
-                    <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 400, letterSpacing: 0, textTransform: 'none' }}>(optional)</span>
-                  </label>
-                  <input
-                    className="input"
-                    type="text"
-                    placeholder="app/api/chat/route.ts"
-                    value={filename}
-                    onChange={e => setFilename(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">
-                  <span className="form-label__icon">💻</span>
-                  Code to Scan
-                </label>
-                <textarea
-                  className={`input input--textarea ${error && !code.trim() ? 'input--error' : ''}`}
-                  placeholder="Paste your AI route handler, chat API, or any code that calls an LLM..."
-                  value={code}
-                  onChange={e => setCode(e.target.value)}
-                  style={{ minHeight: 200, fontFamily: 'var(--font-mono)', fontSize: 11 }}
-                />
-              </div>
-              <div style={{
-                padding: '10px 14px',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-subtle)',
-                background: 'var(--bg-elevated)',
-                fontSize: 10,
-                color: 'var(--text-muted)',
-                lineHeight: 1.7,
-                marginBottom: 20,
-              }}>
-                <strong style={{ color: 'var(--text-secondary)' }}>How it works:</strong> Like CodeRabbit for AI security — scans for prompt injection
-                risks, exposed API keys, missing auth, unsafe output handling, and 7 more AI-specific vulnerability classes.
-              </div>
-            </>
-          )}
-
-          {error && (
-            <div style={{
-              fontSize: 11, color: 'var(--red)', background: 'var(--red-bg)',
-              border: '1px solid rgba(226,75,74,0.2)', borderRadius: 'var(--radius-sm)',
-              padding: '8px 12px', marginBottom: 16, animation: 'fadeIn 0.3s ease-out',
-            }}>
-              ⚠ {error}
-            </div>
-          )}
-
-          <button
-            className={`btn btn--primary ${loading ? 'btn--loading' : ''}`}
-            onClick={run}
-            disabled={loading}
+      {/* ── HERO ── */}
+      <section className="min-h-screen flex flex-col md:flex-row items-start px-8 pt-[80px] pb-16 relative overflow-hidden">
+        <div className="flex-[7] flex flex-col justify-start pt-[100px]">
+          <h1
+            className="text-[clamp(3.5rem,12vw,8rem)] font-display font-black uppercase leading-[0.9] tracking-[-0.02em] text-foreground"
+            style={{ animation: 'crash-in-left 0.6s ease-out forwards', transform: 'translateX(-100vw)' }}
           >
-            {loading ? (
-              <><span className="spinner" /> Starting scan...</>
-            ) : mode === 'website' ? (
-              <>⚡ Break This Website</>
-            ) : mode === 'browser' ? (
-              <>🖥️ Launch Browser Attack</>
-            ) : mode === 'prompt' ? (
-              <>⚡ Attack This Prompt</>
-            ) : (
-              <>⚡ Scan This Code</>
-            )}
-          </button>
+            YOUR AI<br />AGENT HAS
+          </h1>
+          <HolesTypewriter />
         </div>
 
-        {/* Feature cards */}
-        <div className="features" style={{ maxWidth: 600, margin: '32px auto 0' }}>
-          {[
-            { icon: '💉', title: 'Prompt Injection', desc: '15 attacks — instruction override, role switching, nested injection.' },
-            { icon: '🎯', title: 'Goal Hijacking', desc: '12 attacks — mission reframe, authority claim, emotional manipulation.' },
-            { icon: '📡', title: 'Data Exfiltration', desc: '12 attacks — system prompt leak, API key extraction, context dump.' },
-            { icon: '🔧', title: 'Tool Misuse', desc: '11 attacks — unauthorized file access, code execution, tool chaining.' },
-          ].map((f, i) => (
-            <div className="feature" key={i}>
-              <div className="feature__icon">{f.icon}</div>
-              <div className="feature__title">{f.title}</div>
-              <div className="feature__desc">{f.desc}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Install banner */}
-        <div style={{
-          maxWidth: 600, margin: '24px auto 0',
-          padding: '16px 20px',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border-subtle)',
-          background: 'var(--bg-secondary)',
-          animation: 'fadeInUp 0.5s ease-out 0.4s both',
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-            CLI — 2-step install
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {[
-              '$ npm install -g agentbreaker',
-              '$ agentbreaker scan --url http://localhost:3000',
-            ].map((cmd, i) => (
-              <div key={i} style={{
-                background: 'var(--bg-input)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '8px 12px',
-                fontSize: 11,
-                color: i === 0 ? 'var(--text-secondary)' : 'var(--green)',
-                fontFamily: 'var(--font-mono)',
-              }}>
-                {cmd}
+        <div
+          className="flex-[3] flex flex-col justify-start gap-8 md:pl-12 pt-[100px]"
+          style={{ animation: 'fade-in-simple 0.4s ease-out forwards', animationDelay: '1200ms', opacity: 0 }}
+        >
+          <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-mono">01 / WHAT IT DOES</span>
+          <p className="text-[14px] text-foreground leading-[1.6] font-mono max-w-[380px]">
+            Run 57 adversarial attacks — prompt injections, jailbreaks, goal hijacking, data exfiltration — against any website, prompt, or codebase. Get a fix report before your users find the holes.
+          </p>
+          <div className="flex items-baseline gap-6 flex-wrap">
+            {stats.map((s, i) => (
+              <div key={i} className="flex flex-col gap-1.5">
+                <span className="text-[52px] font-display font-black tabular-nums leading-none"
+                  style={{ color: i === 2 ? 'hsl(var(--primary))' : 'hsl(var(--foreground))' }}>
+                  {s.prefix || ''}{i === 0 ? stat0 : i === 1 ? stat1 : s.num}{s.suffix}
+                </span>
+                <span className="text-[11px] uppercase font-mono leading-tight max-w-[120px]"
+                  style={{ letterSpacing: '0.08em', color: 'rgba(255,255,255,0.55)' }}>
+                  {s.desc}
+                </span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Ethical use statement */}
-        <div style={{
-          maxWidth: 600, margin: '20px auto 0',
-          padding: '14px 18px',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid rgba(74,158,255,0.15)',
-          background: 'rgba(74,158,255,0.04)',
-          fontSize: 10,
-          color: 'var(--text-muted)',
-          lineHeight: 1.8,
-          animation: 'fadeInUp 0.5s ease-out 0.5s both',
-        }}>
-          <span style={{ color: 'var(--blue)', fontWeight: 600 }}>Responsible use: </span>
-          AgentBreaker is built for developers to test their own AI agents and applications.
-          Never use it against agents or systems you don&apos;t own or have explicit permission to test.
-          Security testing is only ethical when you&apos;re the one who built it, or have been asked to break it.
+        {/* Red diagonal stripe */}
+        <div className="absolute bottom-0 left-0 right-0 h-24 bg-primary"
+          style={{ clipPath: 'polygon(0 60%, 100% 0, 100% 100%, 0 100%)', animation: 'fade-in-simple 0.4s ease-out forwards', animationDelay: '1200ms', opacity: 0 }} />
+      </section>
+
+      {/* ── SCAN INPUT ── */}
+      <section className="px-8 py-24 flex flex-col md:flex-row gap-12 md:gap-24">
+        <div className="flex-1 flex flex-col justify-start"
+          style={{ animation: 'snap-up 0.3s ease-out forwards', animationDelay: '1.5s', opacity: 0 }}>
+          <h2 className="text-[clamp(2.5rem,6vw,5rem)] font-display font-black uppercase leading-[0.9] tracking-[-0.02em] text-foreground">
+            SCAN<br />YOUR<br />AGENT
+          </h2>
+          <p className="mt-6 text-[11px] text-muted-foreground font-mono leading-relaxed max-w-[240px]">
+            Choose an attack surface. Paste your target. Run 57 adversarial attacks.
+          </p>
         </div>
 
-        {/* Market context */}
-        <p style={{
-          textAlign: 'center', fontSize: 10, color: 'var(--text-muted)',
-          maxWidth: 600, margin: '14px auto 0', lineHeight: 1.7,
-        }}>
-          $52B AI agent market by 2030 — every deployment is a potential attack surface.
-        </p>
+        <div className="flex-[1.4]" style={{ animation: 'snap-up 0.3s ease-out forwards', animationDelay: '1.7s', opacity: 0 }}>
+          {/* Mode selector */}
+          <div className={`flex border ${BORDER}`}>
+            {MODES.map((m, i) => (
+              <button key={m.id} onClick={() => setMode(m.id)}
+                className={`flex-1 text-[10px] px-3 py-3 font-mono font-bold uppercase tracking-[0.12em] ${i > 0 ? `border-l ${BORDER}` : ''} ${mode === m.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground bg-background'}`}
+                style={{ transition: 'background 0ms, color 0ms' }}>
+                {m.short}
+              </button>
+            ))}
+          </div>
 
-        <div className="footer">AgentBreaker — AI security testing for the vibe-code era</div>
-      </div>
+          {/* Input card */}
+          <div className={`border ${BORDER} border-t-0 bg-card`}
+            style={{ boxShadow: focused ? '0 0 40px rgba(226,75,74,0.15), inset 0 0 0 1px rgba(226,75,74,0.3)' : 'none', transition: 'box-shadow 150ms ease-out' }}>
+
+            {/* Card header */}
+            <div className={`flex items-center justify-between border-b ${BORDER} px-6 py-4`}>
+              <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-mono">
+                {mode === 'prompt' ? 'Agent system prompt' : mode === 'code' ? 'Application code' : 'Target URL'}
+              </span>
+              {mode === 'website' && (
+                <button onClick={handleProbe} disabled={probing || !targetUrl.trim()}
+                  className="text-[11px] text-primary hover:text-foreground font-mono uppercase tracking-wider disabled:opacity-40"
+                  style={{ transition: 'color 0ms' }}>
+                  {probing ? 'Probing...' : 'Auto-detect →'}
+                </button>
+              )}
+            </div>
+
+            {/* Prompt mode */}
+            {mode === 'prompt' && (
+              <textarea value={systemPrompt} onChange={e => setSystemPrompt(e.target.value)}
+                onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+                rows={7} placeholder="Paste your agent's system prompt here..."
+                className="w-full bg-transparent p-6 text-[13px] text-foreground placeholder:text-muted-foreground/30 resize-none focus:outline-none leading-relaxed font-mono" />
+            )}
+
+            {/* Website / Browser mode */}
+            {(mode === 'website' || mode === 'browser') && (
+              <div className="p-6 flex flex-col gap-4" onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}>
+                <input type="url" value={targetUrl} onChange={e => setTargetUrl(e.target.value)}
+                  placeholder="https://your-app.vercel.app"
+                  className={`w-full bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/30 focus:outline-none font-mono border-b ${BORDER} pb-3`} />
+                {mode === 'website' && (
+                  <>
+                    <input type="text" value={endpointPath} onChange={e => setEndpointPath(e.target.value)}
+                      placeholder="/api/chat  (leave blank to auto-detect)"
+                      className={`w-full bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/30 focus:outline-none font-mono border-b ${BORDER} pb-3`} />
+                    {probeResult && (
+                      <p className={`text-[11px] font-mono ${probeResult.found ? 'text-agent-green' : 'text-primary'}`}>
+                        {probeResult.found ? `✓ Found: ${probeResult.endpoint} (${probeResult.format})` : '✗ No endpoint found — enter manually'}
+                      </p>
+                    )}
+                  </>
+                )}
+                {mode === 'browser' && (
+                  <p className="text-[11px] text-muted-foreground font-mono mt-2">Real browser navigates to this URL and types attack prompts via TinyFish Web Agent.</p>
+                )}
+                <div className="h-8" />
+              </div>
+            )}
+
+            {/* Code mode */}
+            {mode === 'code' && (
+              <div onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}>
+                <div className={`flex gap-0 border-b ${BORDER} px-6 py-2`}>
+                  {['typescript', 'javascript', 'python', 'other'].map((l, i) => (
+                    <button key={l} onClick={() => setLanguage(l)}
+                      className={`text-[10px] px-3 py-1.5 font-mono uppercase tracking-wider ${i > 0 ? `border-l ${BORDER}` : ''} ${language === l ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                      style={{ transition: 'color 0ms' }}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+                <textarea value={code} onChange={e => setCode(e.target.value)} rows={7}
+                  placeholder="// Paste your AI application code here..."
+                  className="w-full bg-transparent p-6 text-[13px] text-foreground placeholder:text-muted-foreground/30 resize-none focus:outline-none leading-relaxed font-mono" />
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className={`border-t ${BORDER} px-6 py-4 flex flex-col gap-3`}>
+              <span className="text-[10px] text-muted-foreground tabular-nums font-mono">
+                {mode === 'code' ? `${code.length} chars` : mode === 'prompt' ? `${systemPrompt.length} chars` : targetUrl || 'No target set'} · 57 adversarial attacks ready
+              </span>
+              <button onClick={runScan} disabled={!canScan()}
+                className="w-full flex items-center justify-center gap-3 bg-primary text-primary-foreground px-6 py-4 text-[13px] font-display font-bold uppercase tracking-wider disabled:opacity-20 disabled:cursor-not-allowed active:scale-[0.97]"
+                style={{ transition: 'transform 100ms' }}>
+                <Shield className="w-4 h-4" />
+                RUN SECURITY SCAN
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── CATEGORIES ── */}
+      <section className="px-8 pb-24">
+        <div className={`grid grid-cols-2 gap-px bg-[hsl(0_0%_100%/0.06)]`}>
+          {categories.map((c, i) => (
+            <div key={c.label}
+              className={`bg-background border-l-2 ${c.borderColor} px-8 py-10`}
+              style={{ animation: 'snap-up 0.15s ease-out forwards', animationDelay: `${2100 + i * 80}ms`, opacity: 0 }}>
+              <div className="text-[clamp(2rem,4vw,4rem)] font-display font-black tabular-nums text-foreground leading-none">{c.count}</div>
+              <div className="text-[13px] font-display font-bold uppercase tracking-wider text-muted-foreground mt-3">{c.label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Ethical note */}
+      <section className={`border-t border-[hsl(0_0%_100%/0.06)] px-8 py-8 flex items-center justify-between flex-wrap gap-4`}>
+        <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-mono">
+          Built for developers testing their own agents. Always get permission.
+        </span>
+        <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-mono">
+          HackASU 2026 · $52B AI Security Market
+        </span>
+      </section>
+
+      {/* Footer */}
+      <footer className={`border-t border-[hsl(0_0%_100%/0.06)] px-8 py-6 flex items-center justify-between flex-wrap gap-4 text-[10px] text-muted-foreground font-mono`}>
+        <span className="uppercase tracking-[0.15em]">AgentBreaker · v1.0</span>
+        <span className="uppercase tracking-[0.15em]">Claude-powered · Vendor-neutral · Works with any agent</span>
+      </footer>
     </div>
   )
 }
