@@ -2,7 +2,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Suspense } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Shield } from 'lucide-react'
+import Link from 'next/link'
 
 interface ScanParams {
   mode: 'website' | 'browser' | 'prompt' | 'code'
@@ -119,6 +120,21 @@ function ScanContent() {
                 const rep = event.report
                 setReportId(rep.id)
                 sessionStorage.setItem(`report-${rep.id}`, JSON.stringify(rep))
+                // Save to dashboard history
+                try {
+                  const existing = JSON.parse(localStorage.getItem('agentbreaker-scans') || '[]') as unknown[]
+                  const record = {
+                    id: rep.id,
+                    createdAt: rep.createdAt,
+                    mode: rep.mode || 'prompt',
+                    score: rep.securityScore,
+                    passed: rep.passed,
+                    failed: rep.failed,
+                    totalTests: rep.totalTests,
+                    label: rep.targetUrl || rep.systemPromptSnippet || 'Scan',
+                  }
+                  localStorage.setItem('agentbreaker-scans', JSON.stringify([...existing, record]))
+                } catch { /* ignore storage errors */ }
                 setDone(true)
                 setStatus('Scan complete')
                 await new Promise(r => setTimeout(r, 1200))
@@ -156,14 +172,16 @@ function ScanContent() {
       )}
 
       {/* Nav */}
-      <nav className={`border-b ${BORDER} px-8 py-4 flex items-center gap-4`}>
-        <a href="/" className="text-muted-foreground hover:text-foreground" style={{ transition: 'color 0ms' }}>
-          <ArrowLeft className="w-4 h-4" />
-        </a>
-        <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-mono">
-          AgentBreaker / {modeLabel.toLowerCase().replace(' ', '-')}
+      <nav className={`border-b ${BORDER} px-6 py-4 flex items-center gap-4`}>
+        <Link href="/" className="flex items-center gap-2 mr-2 group">
+          <Shield className="w-5 h-5 text-primary" />
+          <span className="text-[13px] font-display font-black uppercase tracking-[0.08em] text-white group-hover:text-primary hidden md:block" style={{ transition: 'color 0ms' }}>AgentBreaker</span>
+        </Link>
+        <ArrowLeft className="w-3.5 h-3.5 text-white/30" />
+        <span className="text-[10px] uppercase tracking-[0.15em] text-white/50 font-mono">
+          {modeLabel.toLowerCase().replace(' ', '-')}
         </span>
-        <span className="ml-auto text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-mono tabular-nums">
+        <span className="ml-auto text-[10px] uppercase tracking-[0.15em] text-white/50 font-mono tabular-nums">
           {done ? `Complete · ${rows.length} tests` : status}
         </span>
       </nav>

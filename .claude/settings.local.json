@@ -3,7 +3,11 @@
     "allow": [
       "Bash(npx tsc:*)",
       "Bash(node -e \"const p=require\\(''./package.json''\\); console.log\\(''bin:'', JSON.stringify\\(p.bin\\)\\); console.log\\(''private:'', p.private\\)\")",
-      "WebSearch"
+      "WebSearch",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(npm run:*)"
     ]
   }
 }

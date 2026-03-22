@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { ArrowLeft, ChevronDown, ChevronRight, FileDown, Copy, Check } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, FileDown, Copy, Check, Shield } from 'lucide-react'
+import Link from 'next/link'
 import { buildFixPrompt } from '@/lib/fix-suggestions'
 
 interface TestResult {
@@ -125,23 +126,25 @@ export default function ReportPage() {
     <div className="min-h-screen flex flex-col bg-background">
 
       {/* Nav */}
-      <nav className={`border-b ${BORDER} px-8 py-4 flex items-center justify-between`}>
+      <nav className={`border-b ${BORDER} px-6 py-4 flex items-center justify-between`}>
         <div className="flex items-center gap-4">
-          <a href="/scan" className="text-muted-foreground hover:text-foreground" style={{ transition: 'color 0ms' }}>
-            <ArrowLeft className="w-4 h-4" />
-          </a>
-          <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-mono">
-            AgentBreaker / report / {id?.slice(0, 8)}
+          <Link href="/" className="flex items-center gap-2 group">
+            <Shield className="w-5 h-5 text-primary" />
+            <span className="text-[13px] font-display font-black uppercase tracking-[0.08em] text-white group-hover:text-primary hidden md:block" style={{ transition: 'color 0ms' }}>AgentBreaker</span>
+          </Link>
+          <ArrowLeft className="w-3.5 h-3.5 text-white/30" />
+          <span className="text-[10px] uppercase tracking-[0.15em] text-white/50 font-mono">
+            report / {id?.slice(0, 8)}
           </span>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={handleCopyFix}
-            className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground font-mono active:scale-[0.97]"
+            className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-white/50 hover:text-white font-mono active:scale-[0.97]"
             style={{ transition: 'color 0ms, transform 100ms' }}>
             {copied ? <Check className="w-3.5 h-3.5 text-agent-green" /> : <Copy className="w-3.5 h-3.5" />}
             {copied ? 'Copied!' : 'Copy Fix Prompt'}
           </button>
-          <button className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground font-mono active:scale-[0.97]"
+          <button className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-white/50 hover:text-white font-mono active:scale-[0.97]"
             style={{ transition: 'color 0ms, transform 100ms' }}>
             <FileDown className="w-3.5 h-3.5" /> Export
           </button>
