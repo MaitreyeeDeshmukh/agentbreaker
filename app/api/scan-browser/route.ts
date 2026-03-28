@@ -79,7 +79,17 @@ async function runTinyFishAttack(
     })
 
     if (!res.ok) {
-      return { response: `[TinyFish error: HTTP ${res.status}]`, screenshots }
+      let errorDetail = ''
+      try {
+        const errBody = await res.text()
+        const errJson = JSON.parse(errBody)
+        errorDetail = errJson?.error?.code
+          ? `${errJson.error.code}: ${errJson.error.message || ''}`
+          : errBody.substring(0, 200)
+      } catch {
+        errorDetail = `HTTP ${res.status}`
+      }
+      return { response: `[TinyFish error: ${errorDetail}]`, screenshots }
     }
 
     const reader = res.body?.getReader()
