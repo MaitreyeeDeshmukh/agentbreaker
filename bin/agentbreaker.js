@@ -182,6 +182,7 @@ async function runScanUrl() {
     let responseText = ''
     let evalResult = ''
     let vulnerable = false
+    let inconclusive = false
     let error = null
 
     try {
@@ -199,15 +200,17 @@ async function runScanUrl() {
       responseText = extractResponseText(data)
     } catch (err) {
       error = err.message
-      responseText = '[No response - connection error]'
+      responseText = '[INCONCLUSIVE: connection error]'
+      inconclusive = true
     }
 
     try {
       evalResult = await evaluateWithAI(attack, responseText)
       vulnerable = evalResult.toUpperCase().startsWith('VULNERABLE')
     } catch (err) {
-      evalResult = 'SAFE (evaluation error)'
+      evalResult = 'INCONCLUSIVE (evaluation error: ' + err.message + ')'
       vulnerable = false
+      inconclusive = true
     }
 
     process.stdout.write(' '.repeat(70) + '\r')
@@ -215,7 +218,10 @@ async function runScanUrl() {
     const severityLabel = attack.severity.toUpperCase()
     const reason = evalResult.replace(/^(VULNERABLE|SAFE)[:\s]*/i, '').trim()
 
-    if (vulnerable) {
+    if (inconclusive) {
+      console.log(`  ${YELLOW}⊘ [${severityLabel}] ${attack.name} — INCONCLUSIVE${RESET}`)
+      if (reason) console.log(`    ${DIM}${reason}${RESET}`)
+    } else if (vulnerable) {
       console.log(`  ${RED}✗ [${severityLabel}] ${attack.name} — VULNERABLE${RESET}`)
       if (reason) console.log(`    ${DIM}${reason}${RESET}`)
     } else {
@@ -229,6 +235,7 @@ async function runScanUrl() {
       severity: attack.severity,
       name: attack.name,
       vulnerable,
+      inconclusive,
       evalResult,
       responsePreview: responseText.slice(0, 200),
       error,
@@ -236,18 +243,23 @@ async function runScanUrl() {
   }
 
   const total = results.length
-  const passed = results.filter(r => !r.vulnerable).length
-  const failed = results.filter(r => r.vulnerable).length
-  const score = Math.round((passed / total) * 100)
+  const tested = results.filter(r => !r.inconclusive)
+  const passed = tested.filter(r => !r.vulnerable).length
+  const failed = tested.filter(r => r.vulnerable).length
+  const inconclusiveCount = results.filter(r => r.inconclusive).length
+  const score = tested.length === 0 ? 0 : Math.round((passed / tested.length) * 100)
 
   console.log(`\n${DIM}─────────────────────────────────────────────${RESET}`)
   console.log(`${BOLD}◆ Scan Complete${RESET}`)
   console.log(`${CYAN}◇ Score: ${score}/100${RESET}`)
-  console.log(`${GREEN}◇ Passed: ${passed}/${total}${RESET}`)
+  console.log(`${GREEN}◇ Passed: ${passed}/${tested.length}${RESET}`)
   if (failed > 0) {
     console.log(`${RED}◇ Vulnerabilities: ${failed} found${RESET}`)
   } else {
     console.log(`${GREEN}◇ Vulnerabilities: 0 found${RESET}`)
+  }
+  if (inconclusiveCount > 0) {
+    console.log(`${YELLOW}◇ Inconclusive: ${inconclusiveCount} (could not test)${RESET}`)
   }
 
   if (failed > 0) {
@@ -309,6 +321,7 @@ async function runScanPrompt() {
     let responseText = ''
     let evalResult = ''
     let vulnerable = false
+    let inconclusive = false
     let error = null
 
     try {

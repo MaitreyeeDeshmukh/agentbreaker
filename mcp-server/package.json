@@ -1,0 +1,27 @@
+{
+  "name": "agentbreaker-mcp",
+  "version": "0.1.0",
+  "description": "AgentBreaker MCP Server — AI security testing as a tool for Claude Code, Cursor, and any MCP-compatible coding agent",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "agentbreaker-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "keywords": ["mcp", "ai-security", "agentbreaker", "prompt-injection", "security-testing"],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@anthropic-ai/sdk": "^0.39.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0",
+    "ts-node": "^10.9.0"
+  }
+}

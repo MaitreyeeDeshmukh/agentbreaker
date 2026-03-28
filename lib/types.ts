@@ -8,6 +8,7 @@ export interface TestResult {
   name: string
   severity: string
   passed: boolean
+  inconclusive?: boolean
   agentResponse: string
   reasoning: string
   reproductionSteps: string

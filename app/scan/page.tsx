@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Suspense } from 'react'
-import { ArrowLeft, Shield } from 'lucide-react'
+import { ArrowLeft, Shield, Eye, Clock, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
 interface ScanParams {
@@ -22,6 +22,7 @@ interface AttackRow {
   category: string
   severity: string
   passed: boolean
+  inconclusive?: boolean
   httpStatus?: number
 }
 
@@ -41,16 +42,34 @@ function ScanContent() {
   const [status, setStatus]     = useState('Initializing...')
   const [mode, setMode]         = useState<ScanParams['mode']>('prompt')
   const [reportId, setReportId] = useState('')
+  const [screenshot, setScreenshot] = useState<string>('')
+  const [attackPayload, setAttackPayload] = useState<string>('')
+  const [startTime]             = useState(Date.now())
+  const [eta, setEta]           = useState('')
   const listRef = useRef<HTMLDivElement>(null)
 
-  const vulnerable = rows.filter(r => !r.passed).length
-  const critical   = rows.filter(r => !r.passed && r.severity === 'critical').length
-  const high       = rows.filter(r => !r.passed && r.severity === 'high').length
-  const medium     = rows.filter(r => !r.passed && r.severity === 'medium').length
-  const low        = rows.filter(r => !r.passed && r.severity === 'low').length
-  const score      = done ? Math.max(0, Math.min(100, 100 - critical * 25 - high * 12 - medium * 5 - low * 2)) : 0
+  const tested       = rows.filter(r => !r.inconclusive)
+  const inconclusiveCount = rows.filter(r => r.inconclusive).length
+  const vulnerable   = tested.filter(r => !r.passed).length
+  const critical     = tested.filter(r => !r.passed && r.severity === 'critical').length
+  const high         = tested.filter(r => !r.passed && r.severity === 'high').length
+  const medium       = tested.filter(r => !r.passed && r.severity === 'medium').length
+  const low          = tested.filter(r => !r.passed && r.severity === 'low').length
+  const score        = done
+    ? (tested.length === 0 ? 0 : Math.max(0, Math.min(100, 100 - critical * 25 - high * 12 - medium * 5 - low * 2)))
+    : 0
 
   const scoreColor = (s: number) => s >= 80 ? 'hsl(var(--agent-green))' : s >= 60 ? 'hsl(var(--agent-amber))' : 'hsl(var(--primary))'
+
+  // Compute ETA
+  useEffect(() => {
+    if (done || rows.length === 0 || rows.length >= total) { setEta(''); return }
+    const elapsed = (Date.now() - startTime) / 1000
+    const perAttack = elapsed / rows.length
+    const remaining = (total - rows.length) * perAttack
+    if (remaining < 60) setEta(`~${Math.ceil(remaining)}s left`)
+    else setEta(`~${Math.ceil(remaining / 60)}m left`)
+  }, [rows.length, done, total, startTime])
 
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight
@@ -108,7 +127,15 @@ function ScanContent() {
                 setTotal(event.total || 57)
               } else if (event.type === 'result') {
                 const r = event.result
-                setRows(prev => [...prev, { id: r.attackId, name: r.name, category: r.category, severity: r.severity, passed: r.passed, httpStatus: r.httpStatus }])
+                setRows(prev => [...prev, {
+                  id: r.attackId,
+                  name: r.name,
+                  category: r.category,
+                  severity: r.severity,
+                  passed: r.passed,
+                  inconclusive: r.inconclusive || false,
+                  httpStatus: r.httpStatus,
+                }])
                 setStatus(`Testing: ${r.name}`)
               } else if (event.type === 'issue') {
                 const iss = event.issue
@@ -116,11 +143,13 @@ function ScanContent() {
                 setStatus(`Found: ${iss.title}`)
               } else if (event.type === 'progress') {
                 setStatus(event.message)
+                if (event.attackPayload) setAttackPayload(event.attackPayload)
+              } else if (event.type === 'screenshot') {
+                if (event.image) setScreenshot(event.image)
               } else if (event.type === 'complete') {
                 const rep = event.report
                 setReportId(rep.id)
                 sessionStorage.setItem(`report-${rep.id}`, JSON.stringify(rep))
-                // Save to dashboard history
                 try {
                   const existing = JSON.parse(localStorage.getItem('agentbreaker-scans') || '[]') as unknown[]
                   const record = {
@@ -130,6 +159,7 @@ function ScanContent() {
                     score: rep.securityScore,
                     passed: rep.passed,
                     failed: rep.failed,
+                    inconclusive: rep.inconclusive || 0,
                     totalTests: rep.totalTests,
                     label: rep.targetUrl || rep.systemPromptSnippet || 'Scan',
                   }
@@ -155,6 +185,7 @@ function ScanContent() {
   }, [router])
 
   const modeLabel = mode === 'website' ? 'API Attack' : mode === 'browser' ? 'Browser Attack' : mode === 'code' ? 'Code Scan' : 'Prompt Scan'
+  const isBrowser = mode === 'browser'
   const BORDER = 'border-[hsl(0_0%_100%/0.06)]'
 
   return (
@@ -181,7 +212,13 @@ function ScanContent() {
         <span className="text-[10px] uppercase tracking-[0.15em] text-white/50 font-mono">
           {modeLabel.toLowerCase().replace(' ', '-')}
         </span>
-        <span className="ml-auto text-[10px] uppercase tracking-[0.15em] text-white/50 font-mono tabular-nums">
+        <span className="ml-auto flex items-center gap-3 text-[10px] uppercase tracking-[0.15em] text-white/50 font-mono tabular-nums">
+          {eta && !done && (
+            <span className="flex items-center gap-1 text-agent-amber">
+              <Clock className="w-3 h-3" />
+              {eta}
+            </span>
+          )}
           {done ? `Complete · ${rows.length} tests` : status}
         </span>
       </nav>
@@ -192,11 +229,46 @@ function ScanContent() {
         <div className="flex-1 flex flex-col overflow-hidden">
 
           {/* Massive counter */}
-          <div className={`px-8 py-8 border-b ${BORDER}`}>
-            <span className="text-[80px] md:text-[100px] font-display font-black leading-none tabular-nums text-foreground tracking-tight">
-              {rows.length}<span className="text-muted-foreground">/{total}</span>
-            </span>
+          <div className={`px-8 py-8 border-b ${BORDER} flex items-end justify-between`}>
+            <div>
+              <span className="text-[80px] md:text-[100px] font-display font-black leading-none tabular-nums text-foreground tracking-tight">
+                {rows.length}<span className="text-muted-foreground">/{total}</span>
+              </span>
+            </div>
+            {inconclusiveCount > 0 && (
+              <div className="flex items-center gap-2 mb-4" style={{ animation: 'snap-up 0.2s ease-out forwards' }}>
+                <AlertTriangle className="w-4 h-4 text-agent-amber" />
+                <span className="text-[11px] font-mono text-agent-amber">{inconclusiveCount} skipped</span>
+              </div>
+            )}
           </div>
+
+          {/* Browser preview panel — only visible during browser attacks */}
+          {isBrowser && !done && (screenshot || attackPayload) && (
+            <div className={`border-b ${BORDER} px-8 py-4 bg-card/50`} style={{ animation: 'snap-up 0.2s ease-out forwards' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <Eye className="w-3.5 h-3.5 text-agent-blue" />
+                <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-agent-blue font-mono">Live Browser Preview</span>
+              </div>
+              <div className="flex gap-4">
+                {screenshot && (
+                  <div className="w-[280px] h-[160px] bg-black/50 border border-white/10 overflow-hidden flex-shrink-0">
+                    <img src={screenshot} alt="Browser view" className="w-full h-full object-cover object-top" />
+                  </div>
+                )}
+                {attackPayload && (
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[9px] font-bold uppercase tracking-[0.15em] text-white/40 font-mono mb-2">
+                      Current Payload
+                    </div>
+                    <div className="text-[11px] font-mono text-primary/80 bg-primary/5 border border-primary/20 p-3 leading-relaxed max-h-[120px] overflow-y-auto">
+                      {attackPayload}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Column headers */}
           <div className={`border-b ${BORDER} px-8 py-2 flex text-[9px] uppercase tracking-[0.15em] text-muted-foreground font-mono`}>
@@ -216,8 +288,11 @@ function ScanContent() {
                 style={{ animation: 'slide-in-left 0.15s ease-out forwards', opacity: 0 }}
               >
                 <span className="w-5 flex-shrink-0">
-                  <span className={`w-2 h-2 inline-block ${r.passed ? 'bg-agent-green' : 'bg-primary'}`}
-                    style={!r.passed ? { animation: 'pulse-dot 1.5s ease-in-out 2' } : {}} />
+                  <span className={`w-2 h-2 inline-block ${
+                    r.inconclusive ? 'bg-agent-amber' :
+                    r.passed ? 'bg-agent-green' : 'bg-primary'
+                  }`}
+                    style={!r.passed && !r.inconclusive ? { animation: 'pulse-dot 1.5s ease-in-out 2' } : {}} />
                 </span>
                 <span className="w-14 flex-shrink-0 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                   {r.severity === 'critical' ? 'CRIT' : r.severity?.toUpperCase()}
@@ -226,8 +301,11 @@ function ScanContent() {
                   {r.category?.replace('_', ' ')}
                 </span>
                 <span className="flex-1 text-muted-foreground truncate">{r.name}</span>
-                <span className={`w-14 text-right font-bold text-[9px] uppercase tracking-wider ${r.passed ? 'text-agent-green' : 'text-primary'}`}>
-                  {r.passed ? 'PASS' : 'VULN'}
+                <span className={`w-14 text-right font-bold text-[9px] uppercase tracking-wider ${
+                  r.inconclusive ? 'text-agent-amber' :
+                  r.passed ? 'text-agent-green' : 'text-primary'
+                }`}>
+                  {r.inconclusive ? 'SKIP' : r.passed ? 'PASS' : 'VULN'}
                 </span>
               </div>
             ))}
@@ -267,6 +345,11 @@ function ScanContent() {
                 <span className="text-[10px] font-bold uppercase tracking-[0.2em] font-mono" style={{ color: scoreColor(score) }}>
                   {score >= 80 ? 'SECURE' : score >= 60 ? 'AT RISK' : 'CRITICAL'}
                 </span>
+                {inconclusiveCount > 0 && (
+                  <span className="text-[9px] font-mono text-agent-amber mt-1">
+                    {inconclusiveCount} tests could not run
+                  </span>
+                )}
               </div>
               <a href={`/report/${reportId}`}
                 className="block w-full text-center text-[11px] bg-primary text-primary-foreground px-4 py-4 font-display font-bold uppercase tracking-wider active:scale-[0.97]"
@@ -294,6 +377,17 @@ function ScanContent() {
                       </div>
                     </div>
                   )
+                )}
+                {inconclusiveCount > 0 && (
+                  <div>
+                    <div className={`flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground font-mono mb-1`}>
+                      <span>SKIP</span>
+                      <span className="tabular-nums text-agent-amber">{inconclusiveCount}</span>
+                    </div>
+                    <div className={`w-full h-1 bg-[hsl(0_0%_100%/0.06)] overflow-hidden`}>
+                      <div className="h-full bg-agent-amber" style={{ width: `${Math.min((inconclusiveCount / 10) * 100, 100)}%`, transition: 'width 150ms ease-out' }} />
+                    </div>
+                  </div>
                 )}
               </div>
 

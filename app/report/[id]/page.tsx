@@ -11,6 +11,7 @@ interface TestResult {
   name: string
   severity: string
   passed: boolean
+  inconclusive?: boolean
   agentResponse?: string
   reasoning?: string
   reproductionSteps?: string
@@ -50,6 +51,7 @@ interface Report {
   targetUrl?: string
   targetEndpoint?: string
   fixPrompt?: string
+  inconclusive?: number
 }
 
 const catColor: Record<string, string> = {
@@ -94,7 +96,7 @@ export default function ReportPage() {
   const scoreLabel = score >= 80 ? 'SECURE' : score >= 60 ? 'AT RISK' : 'CRITICAL'
 
   // Normalise findings to a common shape
-  type Finding = { id: string; severity: string; category: string; name: string; passed: boolean; response?: string; analysis?: string; reproSteps?: string; payload?: string; fix?: string }
+  type Finding = { id: string; severity: string; category: string; name: string; passed: boolean; inconclusive?: boolean; response?: string; analysis?: string; reproSteps?: string; payload?: string; fix?: string }
 
   const allFindings: Finding[] = isCode
     ? (report.issues || []).map(i => ({
@@ -103,11 +105,13 @@ export default function ReportPage() {
       }))
     : (report.results || []).map(r => ({
         id: r.attackId, severity: r.severity, category: r.category, name: r.name,
-        passed: r.passed, response: r.agentResponse, analysis: r.reasoning, reproSteps: r.reproductionSteps, payload: r.attackPayload, fix: r.fixSuggestion,
+        passed: r.passed, inconclusive: r.inconclusive || false, response: r.agentResponse, analysis: r.reasoning, reproSteps: r.reproductionSteps, payload: r.attackPayload, fix: r.fixSuggestion,
       }))
 
-  const vulnerable = allFindings.filter(f => !f.passed)
-  const critical   = allFindings.filter(f => f.severity === 'critical' && !f.passed)
+  const tested     = allFindings.filter(f => !f.inconclusive)
+  const vulnerable = tested.filter(f => !f.passed)
+  const critical   = tested.filter(f => f.severity === 'critical' && !f.passed)
+  const inconclusive = allFindings.filter(f => f.inconclusive)
 
   const filtered: Finding[] =
     filter === 'vulnerable' ? vulnerable :
@@ -184,7 +188,7 @@ export default function ReportPage() {
         style={{ animation: 'snap-up 0.2s ease-out forwards', animationDelay: '0.15s', opacity: 0 }}>
         {(isCode
           ? [['Total Issues', allFindings.length, 'text-foreground'], ['Critical', report.criticalCount, 'text-primary'], ['High', report.highCount, 'text-agent-amber'], ['Score', score, scoreClr]]
-          : [['Tests', report.totalTests || allFindings.length, 'text-foreground'], ['Vulnerable', (report.failed || 0), 'text-primary'], ['Resisted', (report.passed || 0), 'text-agent-green'], ['Critical', report.criticalCount, 'text-primary']]
+          : [['Tests', report.totalTests || allFindings.length, 'text-foreground'], ['Vulnerable', (report.failed || 0), 'text-primary'], ['Resisted', (report.passed || 0), 'text-agent-green'], ['Skipped', (report.inconclusive || inconclusive.length), 'text-agent-amber']]
         ).map(([label, val, color], i) => (
           <div key={label as string} className={`flex-1 px-8 py-6 ${i < 3 ? `border-r ${BORDER}` : ''}`}>
             <div className={`text-3xl font-display font-black tabular-nums ${color}`}>{val}</div>
@@ -248,8 +252,11 @@ export default function ReportPage() {
                   <span className={`text-[9px] px-2 py-0.5 font-bold uppercase tracking-wider text-muted-foreground border ${BORDER} font-mono`}>{f.severity}</span>
                   <span className={`text-[11px] font-mono ${catColor[f.category] || 'text-muted-foreground'}`}>{f.category?.replace('_', ' ')}</span>
                   <span className="flex-1 text-[11px] text-muted-foreground font-mono truncate">{f.name}</span>
-                  <span className={`font-bold text-[9px] uppercase tracking-[0.15em] font-mono ${f.passed ? 'text-agent-green' : 'text-primary'}`}>
-                    {f.passed ? 'PASS' : isCode ? 'ISSUE' : 'VULN'}
+                  <span className={`font-bold text-[9px] uppercase tracking-[0.15em] font-mono ${
+                    f.inconclusive ? 'text-agent-amber' :
+                    f.passed ? 'text-agent-green' : 'text-primary'
+                  }`}>
+                    {f.inconclusive ? 'SKIP' : f.passed ? 'PASS' : isCode ? 'ISSUE' : 'VULN'}
                   </span>
                 </button>
 

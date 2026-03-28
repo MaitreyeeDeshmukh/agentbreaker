@@ -147,7 +147,7 @@ Respond with ONLY the JSON array, no markdown.`,
     messages: [{ role: 'user', content: `Analyze this system prompt for vulnerabilities:\n\n${systemPrompt}` }],
   });
 
-  const raw = msg.content[0].type === 'text' ? msg.content[0].text : '[]';
+  const raw = msg.content[0].type === 'text' ? (msg.content[0].text ?? '[]') : '[]';
   const jsonMatch = raw.match(/\[[\s\S]*\]/);
   try {
     const findings = JSON.parse(jsonMatch ? jsonMatch[0] : raw);

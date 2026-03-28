@@ -39,6 +39,64 @@ AgentBreaker supports four primary attack vectors:
 - **Vulnerability Dashboard:** Scorecard generation (`0-100` Security Score) calculating the severity of vulnerabilities.
 - **Fix Suggestions:** Actionable remediation suggestions specific to your framework and prompt.
 - **PDF Reporting:** Export full audit reports using `jspdf` and `html2canvas`.
+- **Live Browser Preview:** See TinyFish navigating your app in real-time during browser attacks.
+- **Inconclusive Detection:** Tests that can't reach the target are marked as "skipped" — never false passes.
+
+## 🔌 MCP Server — Plug into Claude Code / Cursor / Any AI Coding Tool
+
+AgentBreaker is the **security layer for vibe-coders**. Like Supabase is for backend and Vercel is for deployment, AgentBreaker is for security.
+
+### Quick Setup
+
+Add this to your project's `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "agentbreaker": {
+      "command": "npx",
+      "args": ["-y", "agentbreaker-mcp@latest"],
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-your-key-here"
+      }
+    }
+  }
+}
+```
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `agentbreaker_scan_prompt` | Test a system prompt against 20 attack vectors |
+| `agentbreaker_scan_code` | Static analysis of AI code for security issues |
+| `agentbreaker_scan_url` | Probe and attack a live AI API endpoint |
+| `agentbreaker_fix` | Generate actionable fix instructions from vulnerabilities |
+
+### Usage Examples
+
+In Claude Code or Cursor, just ask:
+
+- *"Scan my system prompt for security issues"* → calls `agentbreaker_scan_prompt`
+- *"Check this code for prompt injection vulnerabilities"* → calls `agentbreaker_scan_code`
+- *"Test my app at https://myapp.vercel.app"* → calls `agentbreaker_scan_url`
+- *"Fix the vulnerabilities you found"* → calls `agentbreaker_fix`
+
+### CLI Usage
+
+```bash
+# Scan a live website
+npx agentbreaker scan --url https://myapp.vercel.app
+
+# Scan a system prompt file
+npx agentbreaker scan --prompt ./system-prompt.txt
+
+# Probe for AI endpoints
+npx agentbreaker probe --url https://myapp.vercel.app
+
+# Output as JSON
+npx agentbreaker scan --url https://myapp.vercel.app --output json
+```
 
 ## 🛠️ Tech Stack
 
