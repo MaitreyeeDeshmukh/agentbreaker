@@ -1,8 +1,8 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Suspense } from 'react'
-import { ArrowLeft, Shield, Eye, Clock, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Shield, Eye, Clock, AlertTriangle, Square } from 'lucide-react'
 import Link from 'next/link'
 
 interface ScanParams {
@@ -46,7 +46,10 @@ function ScanContent() {
   const [attackPayload, setAttackPayload] = useState<string>('')
   const [startTime]             = useState(Date.now())
   const [eta, setEta]           = useState('')
+  const [stopped, setStopped]   = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const cancelledRef = useRef(false)
 
   const tested       = rows.filter(r => !r.inconclusive)
   const inconclusiveCount = rows.filter(r => r.inconclusive).length
@@ -60,6 +63,14 @@ function ScanContent() {
     : 0
 
   const scoreColor = (s: number) => s >= 80 ? 'hsl(var(--agent-green))' : s >= 60 ? 'hsl(var(--agent-amber))' : 'hsl(var(--primary))'
+
+  const stopScan = useCallback(() => {
+    cancelledRef.current = true
+    setStopped(true)
+    setDone(true)
+    setStatus('Scan stopped by user')
+    if (abortRef.current) abortRef.current.abort()
+  }, [])
 
   // Compute ETA
   useEffect(() => {
@@ -82,7 +93,8 @@ function ScanContent() {
     try { params = JSON.parse(raw) } catch { router.push('/'); return }
     setMode(params.mode)
 
-    let cancelled = false
+    const controller = new AbortController()
+    abortRef.current = controller
 
     async function runScan() {
       let apiEndpoint: string
@@ -104,7 +116,12 @@ function ScanContent() {
 
       try {
         setStatus('Launching attacks...')
-        const res = await fetch(apiEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        const res = await fetch(apiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        })
         if (!res.ok) throw new Error(`Server error ${res.status}`)
 
         const reader = res.body!.getReader()
@@ -112,7 +129,7 @@ function ScanContent() {
         let buffer = ''
 
         while (true) {
-          if (cancelled) { reader.cancel(); return }
+          if (cancelledRef.current) { reader.cancel(); return }
           const { done: streamDone, value } = await reader.read()
           if (streamDone) break
           buffer += decoder.decode(value, { stream: true })
@@ -168,12 +185,13 @@ function ScanContent() {
                 setDone(true)
                 setStatus('Scan complete')
                 await new Promise(r => setTimeout(r, 1200))
-                if (!cancelled) router.push(`/report/${rep.id}`)
+                if (!cancelledRef.current) router.push(`/report/${rep.id}`)
               }
             } catch { /* skip malformed */ }
           }
         }
       } catch (e: unknown) {
+        if ((e as Error).name === 'AbortError') return // user cancelled
         const msg = e instanceof Error ? e.message : 'Scan failed'
         setError(msg)
         setStatus('Error')
@@ -181,7 +199,10 @@ function ScanContent() {
     }
 
     runScan()
-    return () => { cancelled = true }
+    return () => {
+      cancelledRef.current = true
+      controller.abort()
+    }
   }, [router])
 
   const modeLabel = mode === 'website' ? 'API Attack' : mode === 'browser' ? 'Browser Attack' : mode === 'code' ? 'Code Scan' : 'Prompt Scan'
@@ -189,7 +210,7 @@ function ScanContent() {
   const BORDER = 'border-[hsl(0_0%_100%/0.06)]'
 
   return (
-    <div className={`min-h-screen flex flex-col scan-cursor bg-background`}>
+    <div className="min-h-screen flex flex-col bg-background">
 
       {/* Progress bar — 3px glowing */}
       {!done && (
@@ -202,16 +223,31 @@ function ScanContent() {
         </div>
       )}
 
-      {/* Nav */}
+      {/* Nav with back button + stop button */}
       <nav className={`border-b ${BORDER} px-6 py-4 flex items-center gap-4`}>
         <Link href="/" className="flex items-center gap-2 mr-2 group">
           <Shield className="w-5 h-5 text-primary" />
           <span className="text-[13px] font-display font-black uppercase tracking-[0.08em] text-white group-hover:text-primary hidden md:block" style={{ transition: 'color 0ms' }}>AgentBreaker</span>
         </Link>
-        <ArrowLeft className="w-3.5 h-3.5 text-white/30" />
+
+        {/* Back button — always works */}
+        <button
+          onClick={() => {
+            cancelledRef.current = true
+            if (abortRef.current) abortRef.current.abort()
+            router.push('/')
+          }}
+          className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-white/50 font-mono hover:text-white transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Back</span>
+        </button>
+
+        <span className="text-white/20 text-[10px]">·</span>
         <span className="text-[10px] uppercase tracking-[0.15em] text-white/50 font-mono">
           {modeLabel.toLowerCase().replace(' ', '-')}
         </span>
+
         <span className="ml-auto flex items-center gap-3 text-[10px] uppercase tracking-[0.15em] text-white/50 font-mono tabular-nums">
           {eta && !done && (
             <span className="flex items-center gap-1 text-agent-amber">
@@ -219,6 +255,18 @@ function ScanContent() {
               {eta}
             </span>
           )}
+
+          {/* Stop button */}
+          {!done && !error && (
+            <button
+              onClick={stopScan}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-colors"
+            >
+              <Square className="w-3 h-3 fill-current" />
+              <span className="text-[9px] font-bold uppercase tracking-wider">Stop</span>
+            </button>
+          )}
+
           {done ? `Complete · ${rows.length} tests` : status}
         </span>
       </nav>
@@ -243,29 +291,40 @@ function ScanContent() {
             )}
           </div>
 
-          {/* Browser preview panel — only visible during browser attacks */}
-          {isBrowser && !done && (screenshot || attackPayload) && (
+          {/* Browser preview panel — always visible during browser attacks (while not done) */}
+          {isBrowser && !done && (
             <div className={`border-b ${BORDER} px-8 py-4 bg-card/50`} style={{ animation: 'snap-up 0.2s ease-out forwards' }}>
               <div className="flex items-center gap-2 mb-3">
                 <Eye className="w-3.5 h-3.5 text-agent-blue" />
                 <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-agent-blue font-mono">Live Browser Preview</span>
+                {!screenshot && (
+                  <span className="text-[9px] font-mono text-white/30 ml-2">Waiting for browser session...</span>
+                )}
               </div>
               <div className="flex gap-4">
-                {screenshot && (
-                  <div className="w-[280px] h-[160px] bg-black/50 border border-white/10 overflow-hidden flex-shrink-0">
+                <div className="w-[280px] h-[160px] bg-black/50 border border-white/10 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                  {screenshot ? (
                     <img src={screenshot} alt="Browser view" className="w-full h-full object-cover object-top" />
-                  </div>
-                )}
-                {attackPayload && (
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[9px] font-bold uppercase tracking-[0.15em] text-white/40 font-mono mb-2">
-                      Current Payload
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="flex gap-1">
+                        {[0, 1, 2].map(i => (
+                          <span key={i} className="w-1.5 h-1.5 bg-agent-blue rounded-full"
+                            style={{ animation: 'typing-dot 1.2s ease-in-out infinite', animationDelay: `${i * 0.15}s` }} />
+                        ))}
+                      </div>
+                      <span className="text-[9px] text-white/30 font-mono">Connecting...</span>
                     </div>
-                    <div className="text-[11px] font-mono text-primary/80 bg-primary/5 border border-primary/20 p-3 leading-relaxed max-h-[120px] overflow-y-auto">
-                      {attackPayload}
-                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[9px] font-bold uppercase tracking-[0.15em] text-white/40 font-mono mb-2">
+                    Current Payload
                   </div>
-                )}
+                  <div className="text-[11px] font-mono text-primary/80 bg-primary/5 border border-primary/20 p-3 leading-relaxed max-h-[120px] overflow-y-auto">
+                    {attackPayload || 'Preparing attack payload...'}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -323,6 +382,19 @@ function ScanContent() {
               </div>
             )}
 
+            {/* Stopped message */}
+            {stopped && (
+              <div className="px-8 py-6">
+                <p className="text-[12px] text-agent-amber font-mono">■ Scan stopped — {rows.length} of {total} attacks completed</p>
+                <div className="flex gap-4 mt-4">
+                  <a href="/" className="text-[11px] font-mono text-muted-foreground hover:text-foreground uppercase tracking-wider">← Back to scanner</a>
+                  {reportId && (
+                    <a href={`/report/${reportId}`} className="text-[11px] font-mono text-primary hover:text-white uppercase tracking-wider">View partial report →</a>
+                  )}
+                </div>
+              </div>
+            )}
+
             {error && (
               <div className="px-8 py-6">
                 <p className="text-[12px] text-primary font-mono">⚠ {error}</p>
@@ -350,12 +422,24 @@ function ScanContent() {
                     {inconclusiveCount} tests could not run
                   </span>
                 )}
+                {stopped && (
+                  <span className="text-[9px] font-mono text-agent-amber mt-1">
+                    Partial results ({rows.length}/{total})
+                  </span>
+                )}
               </div>
-              <a href={`/report/${reportId}`}
-                className="block w-full text-center text-[11px] bg-primary text-primary-foreground px-4 py-4 font-display font-bold uppercase tracking-wider active:scale-[0.97]"
-                style={{ transition: 'transform 100ms' }}>
-                View full report →
-              </a>
+              <Link href="/"
+                className="block w-full text-center text-[11px] bg-white/10 text-white px-4 py-3 font-display font-bold uppercase tracking-wider active:scale-[0.97] mb-3 hover:bg-white/15"
+                style={{ transition: 'transform 100ms, background 150ms' }}>
+                ← New scan
+              </Link>
+              {reportId && (
+                <a href={`/report/${reportId}`}
+                  className="block w-full text-center text-[11px] bg-primary text-primary-foreground px-4 py-4 font-display font-bold uppercase tracking-wider active:scale-[0.97]"
+                  style={{ transition: 'transform 100ms' }}>
+                  View full report →
+                </a>
+              )}
             </div>
           ) : (
             <>

@@ -55,9 +55,7 @@
   .font-display {
     font-family: 'Space Grotesk', sans-serif;
   }
-  .scan-cursor {
-    cursor: crosshair;
-  }
+  /* scan-cursor removed — default cursor preferred */
   /* Fix broken CSS variable colors — Tailwind generates var(--x) but vars hold raw HSL channels */
   .bg-background  { background-color: #000000 !important; }
   .bg-card        { background-color: hsl(240 10% 5%) !important; }
