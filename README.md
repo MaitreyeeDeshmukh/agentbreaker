@@ -84,6 +84,8 @@ Ensure you have Node.js 18+ installed. You also need an Anthropic API Key or AWS
 
 5. Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+Or view the live deployment here: **[https://agentbreaker.vercel.app](https://agentbreaker.vercel.app)**
+
 ## 📝 License
 
 This project is licensed under the MIT License.
