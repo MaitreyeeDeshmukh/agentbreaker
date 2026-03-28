@@ -196,6 +196,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     targetUrl = body.targetUrl
     if (!targetUrl) throw new Error('missing targetUrl')
+    // Ensure URL has protocol — TinyFish requires https://
+    targetUrl = targetUrl.trim()
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      targetUrl = `https://${targetUrl}`
+    }
   } catch {
     return new Response(JSON.stringify({ error: 'targetUrl is required' }), { status: 400, headers: CORS })
   }
