@@ -219,7 +219,10 @@ function ScanContent() {
           body: JSON.stringify(body),
           signal: controller.signal,
         })
-        if (!res.ok) throw new Error(`Server error ${res.status}`)
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: `Server error ${res.status}` }));
+          throw new Error(errData.error || `Server error ${res.status}`);
+        }
 
         const reader = res.body!.getReader()
         const decoder = new TextDecoder()
