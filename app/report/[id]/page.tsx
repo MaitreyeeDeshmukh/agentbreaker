@@ -67,17 +67,49 @@ export default function ReportPage() {
   const params     = useParams()
   const id         = params.id as string
   const [report, setReport] = useState<Report | null>(null)
+  const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<Filter>('all')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [copied, setCopied]     = useState(false)
 
   useEffect(() => {
-    const data = sessionStorage.getItem(`report-${id}`)
-    if (data) try { setReport(JSON.parse(data)) } catch { /* ignore */ }
+    async function fetchReport() {
+      // 1. Try session storage first (fastest for recently run scans)
+      const cached = sessionStorage.getItem(`report-${id}`)
+      if (cached) {
+        try {
+          setReport(JSON.parse(cached))
+          setLoading(false)
+          return
+        } catch { /* ignore */ }
+      }
+      
+      // 2. Fallback to Supabase API
+      try {
+        const res = await fetch(`/api/reports/${id}`)
+        if (res.ok) {
+          const { report: dbReport } = await res.json()
+          setReport(dbReport)
+        }
+      } catch (err) {
+        console.error('Failed to load report:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchReport()
   }, [id])
 
   const toggle = (id: string) =>
     setExpanded(prev => { const n = new Set(prev); if (n.has(id)) { n.delete(id) } else { n.add(id) }; return n })
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider animate-pulse">Loading report...</div>
+      </div>
+    )
+  }
 
   if (!report) {
     return (

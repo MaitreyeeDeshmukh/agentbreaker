@@ -34,8 +34,7 @@ function buildFixPrompt(issues: CodeIssue[]): string {
     issues
       .map(
         (i) =>
-          `${i.severity.toUpperCase()}: ${i.title}\n  Location: ${i.location}\n  Fix: ${i.fixSuggestion}\n  ${
-            i.fixCode ? 'Fixed code: ' + i.fixCode : ''
+          `${i.severity.toUpperCase()}: ${i.title}\n  Location: ${i.location}\n  Fix: ${i.fixSuggestion}\n  ${i.fixCode ? 'Fixed code: ' + i.fixCode : ''
           }`
       )
       .join('\n\n')

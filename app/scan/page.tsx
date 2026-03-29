@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { Suspense } from 'react'
 import { ArrowLeft, Shield, Eye, Clock, AlertTriangle, Square } from 'lucide-react'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 
 interface ScanParams {
   mode: 'website' | 'browser' | 'prompt' | 'code'
@@ -28,49 +29,145 @@ interface AttackRow {
 
 const catColor: Record<string, string> = {
   prompt_injection: 'text-agent-red',
-  goal_hijacking:   'text-agent-amber',
-  data_exfiltration:'text-agent-blue',
-  tool_misuse:      'text-agent-green',
+  goal_hijacking: 'text-agent-amber',
+  data_exfiltration: 'text-agent-blue',
+  tool_misuse: 'text-agent-green',
+}
+
+// Helper to push report data to Supabase (authenticated or anonymous)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function saveReportToSupabase(rep: any, label: string) {
+  try {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    await fetch('/api/reports', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        id: rep.id,
+        mode: rep.mode || 'prompt',
+        securityScore: rep.securityScore || 0,
+        passed: rep.passed || 0,
+        failed: rep.failed || 0,
+        totalTests: rep.totalTests || 0,
+        label,
+        reportJson: rep
+      })
+    })
+  } catch (err) {
+    console.error('Failed to save to Supabase:', err)
+  }
 }
 
 function ScanContent() {
   const router = useRouter()
-  const [rows, setRows]         = useState<AttackRow[]>([])
-  const [total, setTotal]       = useState(57)
-  const [done, setDone]         = useState(false)
-  const [error, setError]       = useState('')
-  const [status, setStatus]     = useState('Initializing...')
-  const [mode, setMode]         = useState<ScanParams['mode']>('prompt')
+  const [rows, setRows] = useState<AttackRow[]>([])
+  const [total, setTotal] = useState(57)
+  const [done, setDone] = useState(false)
+  const [error, setError] = useState('')
+  const [status, setStatus] = useState('Initializing...')
+  const [mode, setMode] = useState<ScanParams['mode']>('prompt')
   const [reportId, setReportId] = useState('')
   const [screenshot, setScreenshot] = useState<string>('')
   const [attackPayload, setAttackPayload] = useState<string>('')
-  const [startTime]             = useState(Date.now())
-  const [eta, setEta]           = useState('')
-  const [stopped, setStopped]   = useState(false)
+  const [startTime] = useState(Date.now())
+  const [eta, setEta] = useState('')
+  const [stopped, setStopped] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const cancelledRef = useRef(false)
+  const rawResultsRef = useRef<any[]>([])
 
-  const tested       = rows.filter(r => !r.inconclusive)
+  const tested = rows.filter(r => !r.inconclusive)
   const inconclusiveCount = rows.filter(r => r.inconclusive).length
-  const vulnerable   = tested.filter(r => !r.passed).length
-  const critical     = tested.filter(r => !r.passed && r.severity === 'critical').length
-  const high         = tested.filter(r => !r.passed && r.severity === 'high').length
-  const medium       = tested.filter(r => !r.passed && r.severity === 'medium').length
-  const low          = tested.filter(r => !r.passed && r.severity === 'low').length
-  const score        = done
+  const vulnerable = tested.filter(r => !r.passed).length
+  const critical = tested.filter(r => !r.passed && r.severity === 'critical').length
+  const high = tested.filter(r => !r.passed && r.severity === 'high').length
+  const medium = tested.filter(r => !r.passed && r.severity === 'medium').length
+  const low = tested.filter(r => !r.passed && r.severity === 'low').length
+  const score = done
     ? (tested.length === 0 ? 0 : Math.max(0, Math.min(100, 100 - critical * 25 - high * 12 - medium * 5 - low * 2)))
     : 0
 
   const scoreColor = (s: number) => s >= 80 ? 'hsl(var(--agent-green))' : s >= 60 ? 'hsl(var(--agent-amber))' : 'hsl(var(--primary))'
 
   const stopScan = useCallback(() => {
+    if (done) return
     cancelledRef.current = true
     setStopped(true)
     setDone(true)
-    setStatus('Scan stopped by user')
+    setStatus('Scan stopped manually (Partial results saved)')
     if (abortRef.current) abortRef.current.abort()
-  }, [])
+
+    const id = `rep_partial_${Date.now().toString(36)}`
+    let pMode = 'unknown'
+    let target = 'Unknown'
+    let promptSnippet = 'Partial Scan'
+    try {
+      const raw = sessionStorage.getItem('scan-params')
+      if (raw) {
+        const par = JSON.parse(raw)
+        pMode = par.mode || 'unknown'
+        target = par.targetUrl || 'Unknown'
+        promptSnippet = (par.mode === 'browser' || par.mode === 'website')
+          ? `${par.mode} scan: ${target}`
+          : par.systemPromptSnippet || 'Partial Scan'
+      }
+    } catch { }
+
+    const results = rawResultsRef.current
+    let cCount = 0, hCount = 0, mCount = 0, lCount = 0, iCount = 0
+    for (const r of results) {
+      if (r.inconclusive) iCount++
+      else if (!r.passed) {
+        if (r.severity === 'critical') cCount++
+        else if (r.severity === 'high') hCount++
+        else if (r.severity === 'medium') mCount++
+        else lCount++
+      }
+    }
+    const testedList = results.filter(r => !r.inconclusive)
+    const securityScore = testedList.length === 0 ? 0 : Math.max(0, Math.min(100, 100 - cCount * 25 - hCount * 12 - mCount * 5 - lCount * 2))
+
+    const rep = {
+      id,
+      createdAt: new Date().toISOString(),
+      systemPromptSnippet: promptSnippet,
+      targetUrl: target,
+      mode: pMode,
+      securityScore,
+      passed: testedList.filter(r => r.passed).length,
+      failed: testedList.filter(r => !r.passed).length,
+      inconclusive: iCount,
+      totalTests: results.length,
+      results
+    }
+
+    sessionStorage.setItem(`report-${id}`, JSON.stringify(rep))
+    saveReportToSupabase(rep, target !== 'Unknown' ? target : promptSnippet)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const existing = JSON.parse(localStorage.getItem('agentbreaker-scans') || '[]') as any[]
+      existing.push({
+        id, createdAt: rep.createdAt, mode: rep.mode, score: rep.securityScore,
+        passed: rep.passed, failed: rep.failed, inconclusive: rep.inconclusive,
+        totalTests: rep.totalTests, label: target !== 'Unknown' ? target : promptSnippet,
+      })
+      localStorage.setItem('agentbreaker-scans', JSON.stringify(existing))
+    } catch { }
+
+    setReportId(id)
+    setTimeout(() => {
+      if (!cancelledRef.current) {
+        // Just in case, though cancelledRef is true when stopped via back button
+        // Wait, if they click back we shouldn't redirect. But stopScan is manual!
+        router.push(`/report/${id}`)
+      }
+    }, 800)
+  }, [done, router])
 
   // Compute ETA
   useEffect(() => {
@@ -144,6 +241,7 @@ function ScanContent() {
                 setTotal(event.total || 57)
               } else if (event.type === 'result') {
                 const r = event.result
+                rawResultsRef.current.push(r)
                 setRows(prev => [...prev, {
                   id: r.attackId,
                   name: r.name,
@@ -167,6 +265,10 @@ function ScanContent() {
                 const rep = event.report
                 setReportId(rep.id)
                 sessionStorage.setItem(`report-${rep.id}`, JSON.stringify(rep))
+                
+                const label = rep.targetUrl || rep.systemPromptSnippet || 'Scan'
+                saveReportToSupabase(rep, label)
+
                 try {
                   const existing = JSON.parse(localStorage.getItem('agentbreaker-scans') || '[]') as unknown[]
                   const record = {
@@ -178,7 +280,7 @@ function ScanContent() {
                     failed: rep.failed,
                     inconclusive: rep.inconclusive || 0,
                     totalTests: rep.totalTests,
-                    label: rep.targetUrl || rep.systemPromptSnippet || 'Scan',
+                    label,
                   }
                   localStorage.setItem('agentbreaker-scans', JSON.stringify([...existing, record]))
                 } catch { /* ignore storage errors */ }
@@ -235,7 +337,7 @@ function ScanContent() {
           onClick={() => {
             cancelledRef.current = true
             if (abortRef.current) abortRef.current.abort()
-            router.push('/')
+            router.back()
           }}
           className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-white/50 font-mono hover:text-white transition-colors"
         >
@@ -347,10 +449,9 @@ function ScanContent() {
                 style={{ animation: 'slide-in-left 0.15s ease-out forwards', opacity: 0 }}
               >
                 <span className="w-5 flex-shrink-0">
-                  <span className={`w-2 h-2 inline-block ${
-                    r.inconclusive ? 'bg-agent-amber' :
-                    r.passed ? 'bg-agent-green' : 'bg-primary'
-                  }`}
+                  <span className={`w-2 h-2 inline-block ${r.inconclusive ? 'bg-agent-amber' :
+                      r.passed ? 'bg-agent-green' : 'bg-primary'
+                    }`}
                     style={!r.passed && !r.inconclusive ? { animation: 'pulse-dot 1.5s ease-in-out 2' } : {}} />
                 </span>
                 <span className="w-14 flex-shrink-0 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -360,10 +461,9 @@ function ScanContent() {
                   {r.category?.replace('_', ' ')}
                 </span>
                 <span className="flex-1 text-muted-foreground truncate">{r.name}</span>
-                <span className={`w-14 text-right font-bold text-[9px] uppercase tracking-wider ${
-                  r.inconclusive ? 'text-agent-amber' :
-                  r.passed ? 'text-agent-green' : 'text-primary'
-                }`}>
+                <span className={`w-14 text-right font-bold text-[9px] uppercase tracking-wider ${r.inconclusive ? 'text-agent-amber' :
+                    r.passed ? 'text-agent-green' : 'text-primary'
+                  }`}>
                   {r.inconclusive ? 'SKIP' : r.passed ? 'PASS' : 'VULN'}
                 </span>
               </div>

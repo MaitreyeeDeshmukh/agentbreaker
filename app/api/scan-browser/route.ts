@@ -58,6 +58,7 @@ async function runTinyFishAttack(
   targetUrl: string,
   attackPrompt: string,
   apiKey: string,
+  onScreenshot?: (url: string) => void
 ): Promise<TinyFishResult> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 60000) // 60s per attack
@@ -114,8 +115,13 @@ async function runTinyFishAttack(
         try {
           const event = JSON.parse(raw)
           // Capture screenshots from TinyFish
-          if (event.screenshot) screenshots.push(String(event.screenshot))
-          else if (event.image) screenshots.push(String(event.image))
+          if (event.screenshot) {
+            screenshots.push(String(event.screenshot))
+            if (onScreenshot) onScreenshot(String(event.screenshot))
+          } else if (event.image) {
+            screenshots.push(String(event.image))
+            if (onScreenshot) onScreenshot(String(event.image))
+          }
           // Capture the final result
           if (event.result) finalResult = String(event.result)
           else if (event.output) finalResult = String(event.output)
@@ -217,7 +223,7 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       const send = (data: object) => {
-        try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`)) } catch {}
+        try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`)) } catch { }
       }
 
       send({ type: 'start', reportId, total: attacks.length, targetUrl, mode: 'browser' })
@@ -238,12 +244,12 @@ export async function POST(req: NextRequest) {
               attackPayload: attack.prompt.substring(0, 200),
             })
 
-            const { response: agentResponse, screenshots } = await runTinyFishAttack(targetUrl, attack.prompt, tinyfishKey)
-
-            // Forward screenshot to frontend for live preview
-            if (screenshots.length > 0) {
-              send({ type: 'screenshot', image: screenshots[screenshots.length - 1] })
-            }
+            const { response: agentResponse } = await runTinyFishAttack(
+              targetUrl,
+              attack.prompt,
+              tinyfishKey,
+              (img) => send({ type: 'screenshot', image: img })
+            )
 
             const evaluation = await evaluateResponse(attack.prompt, agentResponse)
 

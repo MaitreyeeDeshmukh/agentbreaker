@@ -3,8 +3,21 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { LayoutDashboard, Globe, Terminal, FileCode, Zap, ArrowRight, Trash2 } from 'lucide-react'
 import Nav from '@/app/components/Nav'
+import { supabase } from '@/lib/supabase'
 
 const BORDER = 'border-[hsl(0_0%_100%/0.06)]'
+
+// Shape returned by Supabase (snake_case columns)
+interface RawReport {
+  id: string
+  created_at: string
+  mode: ScanRecord['mode']
+  security_score: number
+  passed: number
+  failed: number
+  total_tests: number
+  label: string
+}
 
 interface ScanRecord {
   id: string
@@ -50,10 +63,39 @@ export default function DashboardPage() {
   const [scans, setScans] = useState<ScanRecord[]>([])
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('agentbreaker-scans')
-      if (stored) setScans(JSON.parse(stored) as ScanRecord[])
-    } catch { /* ignore */ }
+    async function loadScans() {
+      // Try Supabase first (authenticated users)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        try {
+          const res = await fetch('/api/reports', {
+            headers: { 'Authorization': `Bearer ${session.access_token}` },
+          })
+          const json = await res.json() as { reports?: RawReport[] }
+          if (json.reports && json.reports.length > 0) {
+            // Map Supabase snake_case to our camelCase interface
+            const mapped: ScanRecord[] = json.reports.map((r) => ({
+              id: r.id,
+              createdAt: r.created_at,
+              mode: r.mode,
+              score: r.security_score,
+              passed: r.passed,
+              failed: r.failed,
+              totalTests: r.total_tests,
+              label: r.label,
+            }))
+            setScans(mapped)
+            return
+          }
+        } catch { /* fall through to localStorage */ }
+      }
+      // Fallback: localStorage for anonymous users
+      try {
+        const stored = localStorage.getItem('agentbreaker-scans')
+        if (stored) setScans(JSON.parse(stored) as ScanRecord[])
+      } catch { /* ignore */ }
+    }
+    loadScans()
   }, [])
 
   const clearHistory = () => {

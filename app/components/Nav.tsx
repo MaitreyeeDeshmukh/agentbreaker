@@ -1,8 +1,10 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Shield, Github, X } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { Shield, Github, X, LogOut, User } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 const MENU_LINKS = [
   { label: 'Home',           href: '/' },
@@ -15,7 +17,28 @@ const MENU_LINKS = [
 
 export default function Nav({ transparent = false }: { transparent?: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [user, setUser] = useState<SupabaseUser | null>(null)
   const pathname = usePathname()
+  const router = useRouter()
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null)
+    })
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    setUser(null)
+    router.push('/')
+    router.refresh()
+  }
 
   return (
     <>
@@ -30,15 +53,35 @@ export default function Nav({ transparent = false }: { transparent?: boolean }) 
 
         {/* Right side */}
         <div className="flex items-center gap-4">
-          <a
-            href="https://github.com/login/oauth/authorize"
-            className="flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-[0.12em] text-white/70 hover:text-white border border-white/20 hover:border-white/60 px-3 py-1.5"
-            style={{ transition: 'color 0ms, border-color 0ms' }}
-            onClick={e => { e.preventDefault(); alert('GitHub auth coming soon — see below for setup requirements.') }}
-          >
-            <Github className="w-3.5 h-3.5" />
-            Sign In
-          </a>
+          {user ? (
+            <div className="flex items-center gap-3">
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-[0.12em] text-white/50 hover:text-white"
+                style={{ transition: 'color 0ms' }}
+              >
+                <User className="w-3.5 h-3.5" />
+                <span className="hidden sm:block max-w-[120px] truncate">{user.email?.split('@')[0]}</span>
+              </Link>
+              <button
+                onClick={handleSignOut}
+                className="flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-[0.12em] text-white/50 hover:text-primary border border-white/20 hover:border-primary/40 px-3 py-1.5"
+                style={{ transition: 'color 0ms, border-color 0ms' }}
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/auth"
+              className="flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-[0.12em] text-white/70 hover:text-white border border-white/20 hover:border-white/60 px-3 py-1.5"
+              style={{ transition: 'color 0ms, border-color 0ms' }}
+            >
+              <Github className="w-3.5 h-3.5" />
+              Sign In
+            </Link>
+          )}
           <button
             onClick={() => setMenuOpen(true)}
             className="text-[14px] font-bold uppercase tracking-[0.15em] text-white hover:text-primary font-mono px-2 py-1"
@@ -81,8 +124,27 @@ export default function Nav({ transparent = false }: { transparent?: boolean }) 
             ))}
           </div>
 
-          <div className="py-6 border-t border-[hsl(0_0%_100%/0.06)] flex items-center gap-6">
+          <div className="py-6 border-t border-[hsl(0_0%_100%/0.06)] flex items-center justify-between">
             <span className="text-[11px] font-mono text-white/30 uppercase tracking-wider">HackASU 2026</span>
+            {user ? (
+              <button
+                onClick={() => { handleSignOut(); setMenuOpen(false) }}
+                className="flex items-center gap-1.5 text-[11px] font-mono text-white/30 hover:text-primary uppercase tracking-wider"
+                style={{ transition: 'color 0ms' }}
+              >
+                <LogOut className="w-3 h-3" />
+                Sign out · {user.email?.split('@')[0]}
+              </button>
+            ) : (
+              <Link
+                href="/auth"
+                onClick={() => setMenuOpen(false)}
+                className="text-[11px] font-mono text-white/30 hover:text-primary uppercase tracking-wider"
+                style={{ transition: 'color 0ms' }}
+              >
+                Sign in →
+              </Link>
+            )}
           </div>
         </div>
       )}
