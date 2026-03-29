@@ -10,14 +10,15 @@ const USE_BEDROCK_IAM    = !USE_BEDROCK_BEARER && !!(process.env.AWS_ACCESS_KEY_
 const USE_BEDROCK        = USE_BEDROCK_BEARER || USE_BEDROCK_IAM
 
 // Model IDs differ between Bedrock and direct Anthropic API
+// Using confirmed ACTIVE inference profiles from this Bedrock account
 export const MODELS = {
-  /** Haiku 4.5 — fast evaluations, summaries, per-attack scoring */
+  /** Haiku 3.5 — fast evaluations, summaries, per-attack scoring */
   haiku: USE_BEDROCK
-    ? 'anthropic.claude-haiku-4-5-20251001-v1:0'
+    ? 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
     : 'claude-haiku-4-5-20251001',
-  /** Sonnet 4.6 — heavy analysis: code scan, complex reasoning */
+  /** Claude Sonnet 4 — heavy analysis: code scan, complex reasoning */
   sonnet: USE_BEDROCK
-    ? 'us.anthropic.claude-sonnet-4-6-20250514-v1:0'
+    ? 'global.anthropic.claude-sonnet-4-20250514-v1:0'
     : 'claude-sonnet-4-6',
 }
 
