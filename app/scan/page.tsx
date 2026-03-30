@@ -79,6 +79,7 @@ function ScanContent() {
   const listRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const cancelledRef = useRef(false)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rawResultsRef = useRef<any[]>([])
 
   const tested = rows.filter(r => !r.inconclusive)
