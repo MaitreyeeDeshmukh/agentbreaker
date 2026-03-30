@@ -88,7 +88,7 @@ export default function CodeScanPage() {
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             rows={14}
-            placeholder={`// Paste your AI application code here\nimport Anthropic from '@anthropic-ai/sdk'\n\nconst client = new Anthropic()\n\nexport async function POST(req: Request) {\n  const { message } = await req.json()\n  const response = await client.messages.create({\n    model: 'claude-opus-4-6',\n    system: 'You are a helpful assistant.',\n    messages: [{ role: 'user', content: message }],\n  })\n  return Response.json({ reply: response.content[0].text })\n}`}
+            placeholder={`// Paste your AI application code here\nimport Anthropic from '@anthropic-ai/sdk'\n\nconst client = new Anthropic()\n\nexport async function POST(req: Request) {\n  const { message } = await req.json()\n  const response = await client.messages.create({\n    model: 'claude-3-5-sonnet-20241022',\n    system: 'You are a helpful assistant.',\n    messages: [{ role: 'user', content: message }],\n  })\n  return Response.json({ reply: response.content[0].text })\n}`}
             className="w-full bg-transparent p-6 text-[13px] text-white placeholder:text-white/15 resize-none focus:outline-none leading-relaxed font-mono"
           />
 

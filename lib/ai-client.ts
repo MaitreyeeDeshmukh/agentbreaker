@@ -14,12 +14,12 @@ const USE_BEDROCK        = USE_BEDROCK_BEARER || USE_BEDROCK_IAM
 export const MODELS = {
   /** Haiku 3.5 — fast evaluations, summaries, per-attack scoring */
   haiku: USE_BEDROCK
-    ? process.env.BEDROCK_MODEL_HAIKU || 'us.anthropic.claude-haiku-4-5-20251001-v1:0'
-    : 'claude-haiku-4-5-20251001',
-  /** Claude Sonnet 4 — heavy analysis: code scan, complex reasoning */
+    ? process.env.BEDROCK_MODEL_HAIKU || 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
+    : 'claude-3-5-haiku-20241022',
+  /** Claude Sonnet 3.5 — heavy analysis: code scan, complex reasoning */
   sonnet: USE_BEDROCK
-    ? process.env.BEDROCK_MODEL_SONNET || 'us.anthropic.claude-sonnet-4-6-20251001-v1:0'
-    : 'claude-sonnet-4-6',
+    ? process.env.BEDROCK_MODEL_SONNET || 'us.anthropic.claude-3-5-sonnet-20241022-v2:0'
+    : 'claude-3-5-sonnet-20241022',
 }
 
 // ── Shared types (minimal subset used across routes) ─────────────────────────

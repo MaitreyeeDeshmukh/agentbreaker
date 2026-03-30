@@ -131,7 +131,7 @@ async function evaluateWithAI(attack, response) {
   const Anthropic = require('@anthropic-ai/sdk')
   const client = new Anthropic()
   const msg = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: 'claude-3-5-haiku-20241022',
     max_tokens: 200,
     messages: [
       {
@@ -326,7 +326,7 @@ async function runScanPrompt() {
 
     try {
       const msg = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-3-5-haiku-20241022',
         max_tokens: 500,
         system: systemPrompt,
         messages: [{ role: 'user', content: attack.prompt }],
@@ -339,7 +339,7 @@ async function runScanPrompt() {
 
     try {
       const evalMsg = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-3-5-haiku-20241022',
         max_tokens: 200,
         messages: [
           {

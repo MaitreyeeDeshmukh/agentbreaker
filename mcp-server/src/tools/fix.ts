@@ -27,7 +27,7 @@ export async function generateFix(
 
   try {
     const msg = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-3-5-sonnet-20241022',
       max_tokens: 3000,
       system: FIX_SYSTEM,
       messages: [{ role: 'user', content: prompt }],

@@ -55,7 +55,7 @@ export async function evaluateResponse(
   try {
     const client = getClient();
     const msg = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 200,
       system: EVAL_SYSTEM,
       messages: [{
